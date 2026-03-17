@@ -1,8 +1,16 @@
 # -*- coding:utf-8 -*-
 
+"""
+Listener connector for uPKI CA server.
+
+This module provides the Listener class which handles communication with
+clients via ZeroMQ, processing certificate requests and management operations.
+"""
+
 import os
 import zmq
 import datetime
+from typing import Any
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
@@ -11,30 +19,85 @@ from cryptography.hazmat.primitives import hashes
 
 import upkica
 
+
 class Listener(upkica.core.Common):
-    def __init__(self, config, storage, profiles, admins):
+    """CA Server listener for handling client requests.
+
+    This class handles communication with clients via ZeroMQ, processing
+    certificate requests, CRL generation, and other CA operations.
+
+    Attributes:
+        _config: Configuration object.
+        _storage: Storage backend instance.
+        _profiles: Profiles manager instance.
+        _admins: Admins manager instance.
+        _socket: ZeroMQ socket for communication.
+        _run: Flag indicating if listener is running.
+        _backend: Cryptography backend.
+        _certs_dir: Path to certificates directory.
+        _reqs_dir: Path to requests directory.
+        _keys_dir: Path to private keys directory.
+        _profile_dir: Path to profiles directory.
+        _ca: Dictionary containing CA certificate and key information.
+
+    Args:
+        config: Configuration object.
+        storage: Storage backend instance.
+        profiles: Profiles manager instance.
+        admins: Admins manager instance.
+
+    Raises:
+        Exception: If initialization fails.
+    """
+
+    def __init__(
+        self,
+        config: Any,
+        storage: Any,
+        profiles: Any,
+        admins: Any,
+    ) -> None:
+        """Initialize Listener.
+
+        Args:
+            config: Configuration object.
+            storage: Storage backend instance.
+            profiles: Profiles manager instance.
+            admins: Admins manager instance.
+
+        Raises:
+            Exception: If initialization fails.
+        """
         try:
             super(Listener, self).__init__(config._logger)
         except Exception as err:
             raise Exception(err)
 
-        self._config   = config
-        self._storage  = storage
+        self._config = config
+        self._storage = storage
         self._profiles = profiles
-        self._admins   = admins
-        self._socket   = None
-        self._run      = False
+        self._admins = admins
+        self._socket = None
+        self._run = False
 
         # Register private backend
         self._backend = default_backend()
 
         # Register file path
-        self._certs_dir   = os.path.join(self._config._dpath, 'certs/')
-        self._reqs_dir    = os.path.join(self._config._dpath, 'reqs/')
-        self._keys_dir    = os.path.join(self._config._dpath, 'private/')
-        self._profile_dir = os.path.join(self._config._dpath, 'profiles/')
+        self._certs_dir = os.path.join(self._config._dpath, "certs/")
+        self._reqs_dir = os.path.join(self._config._dpath, "reqs/")
+        self._keys_dir = os.path.join(self._config._dpath, "private/")
+        self._profile_dir = os.path.join(self._config._dpath, "profiles/")
 
-    def _send_error(self, msg):
+    def _send_error(self, msg: str) -> bool:
+        """Send error message to client.
+
+        Args:
+            msg: Error message to send.
+
+        Returns:
+            True if message sent successfully, False otherwise.
+        """
         if msg is None:
             return False
 
@@ -42,50 +105,98 @@ class Listener(upkica.core.Common):
 
         if len(msg) == 0:
             return False
-        
+
         try:
-            self._socket.send_json({'EVENT':'UPKI ERROR', 'MSG': msg})
+            self._socket.send_json({"EVENT": "UPKI ERROR", "MSG": msg})
         except Exception as err:
             raise Exception(err)
 
-    def _send_answer(self, data):
+        return True
+
+    def _send_answer(self, data: dict) -> bool:
+        """Send answer to client.
+
+        Args:
+            data: Data to send as answer.
+
+        Returns:
+            True if message sent successfully, False otherwise.
+        """
         if data is None:
             return False
 
         try:
-            self._socket.send_json({'EVENT':'ANSWER', 'DATA': data})
+            self._socket.send_json({"EVENT": "ANSWER", "DATA": data})
         except Exception as err:
             raise Exception(err)
 
-    def __load_keychain(self):
+        return True
+
+    def __load_keychain(self) -> bool:
+        """Load CA certificate and private key.
+
+        Returns:
+            True if keychain loaded successfully.
+
+        Raises:
+            Exception: If CA certificate or key cannot be loaded.
+        """
         self._ca = dict({})
-        self.output('Loading CA keychain', level="DEBUG")
-        self._ca['public'] = self._storage.get_ca().encode('utf-8')
-        self._ca['private'] = self._storage.get_ca_key().encode('utf-8')
-        
-        try:
-            self._ca['cert'] = x509.load_pem_x509_certificate(self._ca['public'], backend=self._backend)
-            self._ca['dn'] = self._get_dn(self._ca['cert'].subject)
-            self._ca['cn'] = self._get_cn(self._ca['dn'])
-        except Exception as err:
-            raise Exception('Unable to load CA public certificate: {e}'.format(e=err))
+        self.output("Loading CA keychain", level="DEBUG")
+        self._ca["public"] = self._storage.get_ca().encode("utf-8")
+        self._ca["private"] = self._storage.get_ca_key().encode("utf-8")
 
         try:
-            self._ca['key'] = serialization.load_pem_private_key(self._ca['private'], password=self._config.password, backend=self._backend)
+            self._ca["cert"] = x509.load_pem_x509_certificate(
+                self._ca["public"], backend=self._backend
+            )
+            self._ca["dn"] = self._get_dn(self._ca["cert"].subject)
+            self._ca["cn"] = self._get_cn(self._ca["dn"])
         except Exception as err:
-            raise Exception('Unable to load CA private key: {e}'.format(e=err))
+            raise Exception("Unable to load CA public certificate: {e}".format(e=err))
+
+        try:
+            self._ca["key"] = serialization.load_pem_private_key(
+                self._ca["private"],
+                password=self._config.password,
+                backend=self._backend,
+            )
+        except Exception as err:
+            raise Exception("Unable to load CA private key: {e}".format(e=err))
 
         return True
 
-    def _upki_get_ca(self, params):
+    def _upki_get_ca(self, params: dict) -> str:
+        """Get CA certificate.
+
+        Args:
+            params: Request parameters (unused).
+
+        Returns:
+            CA certificate in PEM format.
+
+        Raises:
+            Exception: If certificate cannot be retrieved.
+        """
         try:
-            result = self._ca['public'].decode('utf-8')
+            result = self._ca["public"].decode("utf-8")
         except Exception as err:
             raise Exception(err)
 
         return result
 
-    def _upki_get_crl(self, params):
+    def _upki_get_crl(self, params: dict) -> str:
+        """Get CRL.
+
+        Args:
+            params: Request parameters (unused).
+
+        Returns:
+            CRL in PEM format.
+
+        Raises:
+            Exception: If CRL cannot be retrieved.
+        """
         try:
             crl_pem = self._storage.get_crl()
         except Exception as err:
@@ -93,42 +204,72 @@ class Listener(upkica.core.Common):
 
         return crl_pem
 
-    def _upki_generate_crl(self, params):
-        self.output('Start CRL generation')
+    def _upki_generate_crl(self, params: dict) -> dict:
+        """Generate CRL.
+
+        Args:
+            params: Request parameters (unused).
+
+        Returns:
+            Dictionary with operation status.
+
+        Raises:
+            Exception: If CRL generation fails.
+        """
+        self.output("Start CRL generation")
         now = datetime.datetime.utcnow()
         try:
             builder = (
                 x509.CertificateRevocationListBuilder()
-                .issuer_name(self._ca['cert'].issuer)
+                .issuer_name(self._ca["cert"].issuer)
                 .last_update(now)
                 .next_update(now + datetime.timedelta(days=3))
             )
         except Exception as err:
-            raise Exception('Unable to build CRL: {e}'.format(e=err))
+            raise Exception("Unable to build CRL: {e}".format(e=err))
 
         for entry in self._storage.get_revoked():
             try:
                 revoked_cert = (
                     x509.RevokedCertificateBuilder()
-                    .serial_number(entry['Serial'])
-                    .revocation_date(datetime.datetime.strptime(entry['Revoke_Date'],'%Y%m%d%H%M%SZ'))
-                    .add_extension(x509.CRLReason(x509.ReasonFlags.cessation_of_operation), critical=False)
+                    .serial_number(entry["Serial"])
+                    .revocation_date(
+                        datetime.datetime.strptime(
+                            entry["Revoke_Date"], "%Y%m%d%H%M%SZ"
+                        )
+                    )
+                    .add_extension(
+                        x509.CRLReason(x509.ReasonFlags.cessation_of_operation),
+                        critical=False,
+                    )
                     .build(self._backend)
                 )
             except Exception as err:
-                self.output('Unable to build CRL entry for {d}: {e}'.format(d=entry['DN'], e=err), level='ERROR')
+                self.output(
+                    "Unable to build CRL entry for {d}: {e}".format(
+                        d=entry["DN"], e=err
+                    ),
+                    level="ERROR",
+                )
                 continue
 
             try:
                 builder = builder.add_revoked_certificate(revoked_cert)
             except Exception as err:
-                self.output('Unable to add CRL entry for {d}: {e}'.format(d=entry['DN'], e=err), level='ERROR')
+                self.output(
+                    "Unable to add CRL entry for {d}: {e}".format(d=entry["DN"], e=err),
+                    level="ERROR",
+                )
                 continue
-        
+
         try:
-            crl = builder.sign(private_key=self._ca['key'], algorithm=hashes.SHA256(), backend=self._backend)
+            crl = builder.sign(
+                private_key=self._ca["key"],
+                algorithm=hashes.SHA256(),
+                backend=self._backend,
+            )
         except Exception as err:
-            raise Exception('Unable to sign CSR: {e}'.format(e=err))
+            raise Exception("Unable to sign CSR: {e}".format(e=err))
 
         try:
             crl_pem = crl.public_bytes(serialization.Encoding.PEM)
@@ -136,29 +277,50 @@ class Listener(upkica.core.Common):
         except Exception as err:
             raise Exception(err)
 
-        return {'state': 'OK'}
+        return {"state": "OK"}
 
-    def run(self, ip, port, register=False):
-        def _invalid(_):
-            self._send_error('Unknown command')
+    def run(self, ip: str, port: int, register: bool = False) -> None:
+        """Run the listener server.
+
+        Starts the ZeroMQ listener to accept and process client requests.
+
+        Args:
+            ip: IP address to bind to.
+            port: Port number to bind to.
+            register: Whether to register with a RA (default: False).
+
+        Raises:
+            upkica.core.UPKIError: If listener fails to start.
+            Exception: If keychain loading fails.
+        """
+
+        def _invalid(_) -> bool:
+            self._send_error("Unknown command")
             return False
 
         try:
             self.__load_keychain()
         except Exception as err:
-            raise Exception('Unable to load issuer keychain')
+            raise Exception("Unable to load issuer keychain")
 
         try:
-            self.output('Launching CA listener')
+            self.output("Launching CA listener")
             context = zmq.Context()
-            self.output("Listening socket use ZMQ version {v}".format(v=zmq.zmq_version()), level="DEBUG")
+            self.output(
+                "Listening socket use ZMQ version {v}".format(v=zmq.zmq_version()),
+                level="DEBUG",
+            )
             self._socket = context.socket(zmq.REP)
-            self._socket.bind('tcp://{host}:{port}'.format(host=ip, port=port))
-            self.output("Listener Socket bind to tcp://{host}:{port}".format(host=ip, port=port))
+            self._socket.bind("tcp://{host}:{port}".format(host=ip, port=port))
+            self.output(
+                "Listener Socket bind to tcp://{host}:{port}".format(host=ip, port=port)
+            )
         except zmq.ZMQError as err:
-            raise upkica.core.UPKIError(20,"Stalker process failed with: {e}".format(e=err))
+            raise upkica.core.UPKIError(
+                20, "Stalker process failed with: {e}".format(e=err)
+            )
         except Exception as err:
-            raise upkica.core.UPKIError(20,"Error on connection: {e}".format(e=err))
+            raise upkica.core.UPKIError(20, "Error on connection: {e}".format(e=err))
 
         self._run = True
 
@@ -166,34 +328,36 @@ class Listener(upkica.core.Common):
             try:
                 msg = self._socket.recv_json()
             except zmq.ZMQError as e:
-                self.output('ZMQ Error: {err}'.format(err=e), level="ERROR")
+                self.output("ZMQ Error: {err}".format(err=e), level="ERROR")
                 continue
             except ValueError:
-                self.output('Received unparsable message', level="ERROR")
+                self.output("Received unparsable message", level="ERROR")
                 continue
             except SystemExit:
-                self.output('Poison listener...', level="WARNING")
+                self.output("Poison listener...", level="WARNING")
                 break
-            
+
             try:
-                self.output('Receive {task} action...'.format(task=msg['TASK']), level="INFO")
-                self.output('Action message: {param}'.format(param=msg), level="DEBUG")
-                task = "_upki_{t}".format(t=msg['TASK'].lower())
+                self.output(
+                    "Receive {task} action...".format(task=msg["TASK"]), level="INFO"
+                )
+                self.output("Action message: {param}".format(param=msg), level="DEBUG")
+                task = "_upki_{t}".format(t=msg["TASK"].lower())
             except KeyError:
-                self.output('Received invalid message', level="ERROR")
+                self.output("Received invalid message", level="ERROR")
                 continue
 
             try:
-                params = msg['PARAMS']
+                params = msg["PARAMS"]
             except KeyError:
                 params = {}
 
             func = getattr(self, task, _invalid)
-            
+
             try:
                 res = func(params)
             except Exception as err:
-                self.output('Error: {e}'.format(e=err), level='error')
+                self.output("Error: {e}".format(e=err), level="error")
                 self._send_error(err)
                 continue
 
@@ -203,6 +367,6 @@ class Listener(upkica.core.Common):
             try:
                 self._send_answer(res)
             except Exception as err:
-                self.output('Error: {e}'.format(e=err), level='error')
+                self.output("Error: {e}".format(e=err), level="error")
                 self._send_error(err)
                 continue
