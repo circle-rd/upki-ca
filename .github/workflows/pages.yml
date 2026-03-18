@@ -1,0 +1,109 @@
+name: Deploy Documentation
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'docs/**'
+      - 'README.md'
+      - '.github/workflows/pages.yml'
+
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install mkdocs-material mkdocs-mermaid2-plugin
+
+      - name: Create mkdocs.yml if not exists
+        run: |
+          if [ ! -f mkdocs.yml ]; then
+            cat > mkdocs.yml << 'EOF'
+            site_name: uPKI CA Server
+            site_description: Certificate Authority for PKI operations
+            site_url: https://circle-rd.github.io/upki/
+            
+            repo_url: https://github.com/circle-rd/upki
+            repo_name: circle-rd/upki
+            
+            theme:
+              name: material
+              palette:
+                - scheme: default
+                  primary: blue
+                  accent: blue
+                - scheme: slate
+                  primary: blue
+                  accent: blue
+              features:
+                - navigation.instant
+                - navigation.tracking
+                - navigation.tabs
+                - search.suggest
+            
+            plugins:
+              - mermaid2
+            
+            nav:
+              - Home: index.md
+              - ZMQ Protocol: CA_ZMQ_PROTOCOL.md
+              - CA Specifications: SPECIFICATIONS_CA.md
+            
+            markdown_extensions:
+              - admonition
+              - pymdownx.details
+              - pymdownx.superfences
+              - pymdownx.highlight
+          fi
+
+      - name: Create index.md if not exists
+        run: |
+          if [ ! -f docs/index.md ]; then
+            cat > docs/index.md << 'EOF'
+            # Welcome to uPKI CA Server
+            
+            A production-ready Public Key Infrastructure (PKI) and Certificate Authority system with native ZeroMQ protocol support.
+            
+            ## Quick Links
+            
+            - [ZMQ Protocol Specification](CA_ZMQ_PROTOCOL.md)
+            - [CA Specifications](SPECIFICATIONS_CA.md)
+            - [GitHub Repository](https://github.com/circle-rd/upki)
+            EOF
+          fi
+
+      - name: Build documentation
+        run: mkdocs build
+
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

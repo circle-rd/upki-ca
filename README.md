@@ -1,134 +1,262 @@
-![ProHacktive](https://prohacktive.io/assets/v2/img/logo-prohacktive-purple.png "uPKI from ProHacktive.io")
+# uPKI CA Server
 
-# µPKI
-***NOT READY FOR PRODUCTION USE***
-This project has only been tested on few distributions with Python3.6.
-Due to python usage it *SHOULD* works on many other configurations, but it has NOT been tested.
-Known working OS:
-> - Debian 9 Strech (CA/RA/CLI)
-> - Debian 10 Buster (CA/RA/CLI)
-> - Ubuntu 18.04 (CA/RA/CLI)
-> - MacOS Catalina 10.15 (CLI - without update services)
-> - MacOS Mojave 10.14 (CLI - without update services)
+[![Python Version](https://img.shields.io/pypi/pyversions/upki-ca)](https://pypi.org/project/upki-ca/)
+[![License](https://img.shields.io/pypi/l/upki-ca)](LICENSE)
+[![Docker Image](https://img.shields.io/docker/v/upki-ca/ca-server?label=docker)](https://hub.docker.com/r/upki-ca/ca-server)
 
-## 1. About
-µPki [maɪkroʊ ˈpiː-ˈkeɪ-ˈaɪ] is a small PKI in python that should let you make basic tasks without effort.
-It works in combination with:
-> - [µPKI-RA](https://github.com/proh4cktive/upki-ra)
-> - [µPKI-WEB](https://github.com/proh4cktive/upki-web)
-> - [µPKI-CLI](https://github.com/proh4cktive/upki-cli)
+A production-ready Public Key Infrastructure (PKI) and Certificate Authority system with native ZeroMQ protocol support for secure, high-performance certificate operations.
 
-µPki is the Certification Authority that is invoked by the [µPKI-RA](https://github.com/proh4cktive/upki-ra) Registration Authority.
+## Overview
 
-### 1.1 Dependencies
-The following modules are required
-- PyMongo
-- Cryptography
-- Validators
-- TinyDB
-- PyYAML
-- PyZMQ
+uPKI CA Server is a modern PKI implementation designed for scalable certificate lifecycle management. It provides a complete Certificate Authority solution with support for certificate generation, signing, revocation, CRL management, OCSP responses, certificate profiles, and administrative management.
 
-Some systems libs & tools are also required, make sure you have them pre-installed
+Built on ZeroMQ (ZMQ) for reliable, asynchronous communication, uPKI offers two dedicated ports:
+
+- **Port 5000**: CA operations (certificate signing, revocation, CRL generation, OCSP)
+- **Port 5001**: RA (Registration Authority) registration endpoint
+
+## Key Features
+
+- **Certificate Authority Operations** — Generate Root CA and Intermediate CA certificates with full PKI hierarchy support
+- **Certificate Signing** — Process Certificate Signing Requests (CSRs) with configurable key types and algorithms
+- **Revocation Management** — Revoke certificates and generate Certificate Revocation Lists (CRL)
+- **OCSP Support** — Built-in Online Certificate Status Protocol responder for real-time certificate validation
+- **Certificate Profiles** — Define and enforce certificate templates with custom extensions, key usage, and validity periods
+- **Administrative Management** — Manage CA administrators with role-based access control
+- **ZMQ Protocol** — Native ZeroMQ messaging for reliable, asynchronous CA operations
+- **Multiple Storage Backends** — File-based storage (default) and MongoDB support
+- **Docker Deployment** — Production-ready Docker image for easy containerized deployment
+
+## Requirements
+
+- **Python**: 3.11 or higher
+- **Dependencies**:
+  - `cryptography` — cryptographic operations
+  - `pyyaml` — configuration management
+  - `tinydb` — embedded document database
+  - `zmq` — ZeroMQ messaging
+
+## Installation
+
+### From PyPI
+
 ```bash
-sudo apt update
-sudo apt -y install build-essential libssl-dev libffi-dev python3-dev python3-pip git
+pip install upki-ca
 ```
 
-## 2. Install
-The Installation process require two different phases:
+### From Source
 
-1. clone the current repository
 ```bash
-git clone https://github.com/proh4cktive/upki
-cd ./upki
+# Clone the repository
+git clone https://github.com/circle-rd/upki.git
+cd upki
+
+# Install dependencies
+pip install -e .
 ```
 
-2. Install the dependencies and upki-ca service in order to auto-start service on boot if needed. The install script will also guide you during the setup process of your Registration Authority (RA).
+### Development Installation
+
 ```bash
-./install.sh
+# Install with development dependencies
+pip install -e ".[dev]"
+
+# Run the test suite
+pytest
+
+# Run with coverage report
+pytest --cov=upki_ca --cov-report=html
 ```
 
-If you plan to use two different servers for CA & RA (recommended) you can specify on which ip:port your CA should listen.
+## Quick Start
+
+### 1. Initialize the PKI
+
 ```bash
-./install.sh -i 127.0.0.1 -p 5000
+python ca_server.py init
 ```
 
-## 3. Usage
-The Certification Authority (CA) is not designed to be handled manually. Always use the Registration Authority (RA) in order to manage profile and certificates.
+This creates the Root CA with default configuration. You can customize the CA by editing the configuration file.
 
-If needed you can still check options using
+### 2. Register a Registration Authority (RA)
+
 ```bash
-./ca_server.py --help
+# Register an RA in clear mode (for initial setup)
+python ca_server.py register
 ```
 
-## 3.1 RA registration
-Certification Authority can not run alone, you MUST setup a Registration Authority to manage certificate. *The current process generates a specific RA certificate in order to encrypt the communication between CA and RA in near future, but this is not currently set!*
-Start the CA in register mode in order to generate a one-time seed value that you will have to reflect on your RA start
+### 3. Start the CA Server
+
 ```bash
-./ca_server.py register
+# Start the CA server in TLS mode
+python ca_server.py listen
 ```
 
-## 3.2 Common usage
-Once your RA registered you can simply launch your service by calling 'listen' action. This is basically what the services is doing.
-```bash
-./ca_server.py listen
+The server will start listening on:
+
+- `tcp://*:5000` — CA operations
+- `tcp://*:5001` — RA registration
+
+## Configuration
+
+The CA server uses a YAML configuration file. On first run, it creates a default configuration. Key configuration options include:
+
+```yaml
+ca:
+  name: "uPKI Root CA"
+  validity_days: 3650
+  key_type: "RSA"
+  key_size: 4096
+  hash_algorithm: "sha256"
+
+server:
+  host: "0.0.0.0"
+  ca_port: 5000
+  ra_port: 5001
+
+storage:
+  type: "file"
+  path: "./data"
 ```
 
-## 4. Advanced usage
-If you know what you are doing, some more advanced options allows you to setup a specific CA/RA couple.
+## Usage Examples
 
-### 4.1 Change default directory
-If you want to change the default directory path ($HOME/.upki) for logs, config and storage, please use the 'path' flag
+### Initialize a New CA
+
 ```bash
-./ca_server.py --path /my/new/directory/
+python ca_server.py init --config custom_config.yaml
 ```
 
-If you want to change only log directory you can use the 'log' flag.
+### Start the Server
+
 ```bash
-./ca_server.py --log /my/new/log/directory/
+# Start with default settings
+python ca_server.py listen
+
+# Start on specific host
+python ca_server.py listen --host 127.0.0.1
 ```
 
-### 4.2 Import existing CA keychain
-If you already have a CA private key and certificate you can import them, by putting PEM encoded:
-    . Private Key (.key file)
-    . optionnal Certificate Request (.csr file)
-    . Public Certificate (.crt file)
-All in same directory and call
-```bash
-./ca_server.py init --ca /my/ca/files/
+### ZMQ Client Operations
+
+Connect to the CA server using ZMQ to perform operations:
+
+```python
+import zmq
+
+# CA operations port (5000)
+context = zmq.Context()
+ca_socket = context.socket(zmq.REQ)
+ca_socket.connect("tcp://localhost:5000")
+
+# RA registration port (5001)
+ra_socket = context.socket(zmq.REQ)
+ra_socket.connect("tcp://localhost:5001")
 ```
 
-### 4.3 Listening IP:Port
-In order to deploy for more serious purpose than just testing, you'll probably ended up with a different server for your RA. You must then specify an IP and a port that will must be reflected in your RA configuration.
+For detailed protocol specifications, see [`docs/CA_ZMQ_PROTOCOL.md`](docs/CA_ZMQ_PROTOCOL.md).
 
-For RA registration:
+## Deployment
+
+### Docker Deployment
+
+#### Using Docker Run
+
 ```bash
-./ca_server register --ip X.X.X.X --port 5000
+docker run -d \
+  --name upki-ca \
+  -p 5000:5000 \
+  -p 5001:5001 \
+  -v upki_data:/data \
+  upki-ca/ca-server:latest
 ```
 
-For common operations
-```bash
-./ca_server listen --ip X.X.X.X --port 5000
+#### Using Docker Compose
+
+```yaml
+version: "3.8"
+
+services:
+  upki-ca:
+    image: upki-ca/ca-server:latest
+    ports:
+      - "5000:5000"
+      - "5001:5001"
+    volumes:
+      - upki_data:/data
+    restart: unless-stopped
 ```
 
-## 5. Help
-For more advanced usage please check the app help global
+#### Build from Source
+
 ```bash
-./ca_server.py --help
+docker build -t upki-ca/ca-server:latest .
 ```
 
-You can also have specific help for each actions
+### Direct Deployment
+
 ```bash
-./ca_server.py init --help
+# Install and run as a service
+pip install upki-ca
+python ca_server.py init
+python ca_server.py listen
 ```
 
-## 4. TODO
-Until being ready for production some tasks remains:
-> - Setup Unit Tests
-> - Refactoring of Authority class
-> - Refactoring of Storage classes (FileStorage)
-> - Add support for MongoDB and PostgreSQL
-> - Setup ZMQ-TLS encryption between CA and RA
-> - Setup an intermediate CA in order to sign CSR, and preserve original key file (best-practices)
-> - Add uninstall.sh script
+For production deployments, consider:
+
+- Running behind a reverse proxy (nginx, Traefik)
+- Enabling TLS for all connections
+- Using a proper certificate for the CA
+- Setting up monitoring and logging
+
+## Project Organization
+
+```
+upki/
+├── 📁 .github/              # GitHub workflows and actions
+│   └── workflows/           # CI/CD pipelines
+├── 📁 docs/                 # Documentation
+│   ├── CA_ZMQ_PROTOCOL.md   # ZMQ protocol specification
+│   └── SPECIFICATIONS_CA.md # CA specifications
+├── 📁 tests/                # Test suite
+│   └── test_*.py           # Unit and functional tests
+├── 📁 upki_ca/               # Main package
+│   ├── 📁 ca/              # Certificate Authority core
+│   │   ├── authority.py    # CA implementation
+│   │   ├── cert_request.py  # CSR handling
+│   │   ├── private_key.py   # Private key operations
+│   │   └── public_cert.py   # Certificate handling
+│   ├── 📁 connectors/      # ZMQ connectors
+│   │   ├── listener.py     # Base listener
+│   │   ├── zmq_listener.py  # CA operations listener
+│   │   └── zmq_register.py # RA registration
+│   ├── 📁 core/            # Core utilities
+│   │   ├── common.py       # Common utilities
+│   │   ├── options.py      # Configuration options
+│   │   ├── upki_error.py   # Custom exceptions
+│   │   ├── upki_logger.py  # Logging utilities
+│   │   └── validators.py  # Input validators
+│   ├── 📁 storage/         # Storage backends
+│   │   ├── abstract_storage.py # Storage interface
+│   │   ├── file_storage.py  # File-based storage
+│   │   └── mongo_storage.py # MongoDB storage
+│   └── 📁 utils/           # Utility modules
+│       ├── config.py       # Configuration management
+│       └── profiles.py     # Certificate profiles
+├── 📄 pyproject.toml       # Project configuration
+├── 📄 Dockerfile           # Docker image definition
+└── 📄 ca_server.py          # Main entry point
+```
+
+## Documentation
+
+- [ZMQ Protocol Specification](docs/CA_ZMQ_PROTOCOL.md) — Detailed protocol documentation
+- [CA Specifications](docs/SPECIFICATIONS_CA.md) — Technical specifications
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+## Contributing
+
+Contributions are welcome! Please read our [contributing guidelines](CONTRIBUTING.md) before submitting pull requests.
