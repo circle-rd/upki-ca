@@ -211,9 +211,7 @@ def main() -> int:
     # Parse arguments
     parser = argparse.ArgumentParser(description="uPKI CA Server")
 
-    parser.add_argument(
-        "--path", default=None, help="Base path for storage (default: ~/.upki/ca)"
-    )
+    parser.add_argument("--path", default=None, help="Base path for storage (default: ~/.upki/ca)")
 
     subparsers = parser.add_subparsers(dest="command", help="Command to execute")
 

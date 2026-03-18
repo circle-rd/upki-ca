@@ -227,9 +227,7 @@ class ZMQListener(Listener):
             raise AuthorityError("Authority not initialized")
 
         # Generate certificate
-        cert = self._authority.generate_certificate(
-            cn=cn, profile_name=profile, sans=sans
-        )
+        cert = self._authority.generate_certificate(cn=cn, profile_name=profile, sans=sans)
 
         return {
             "dn": f"/CN={cn}",
@@ -253,9 +251,7 @@ class ZMQListener(Listener):
             raise AuthorityError("Authority not initialized")
 
         # Generate certificate
-        cert = self._authority.generate_certificate(
-            cn=cn, profile_name=profile, sans=sans
-        )
+        cert = self._authority.generate_certificate(cn=cn, profile_name=profile, sans=sans)
 
         result = {
             "dn": f"/CN={cn}",

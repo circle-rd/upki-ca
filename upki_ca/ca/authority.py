@@ -105,9 +105,7 @@ class Authority(Common):
         """Get the profiles manager."""
         return self._profiles
 
-    def initialize(
-        self, keychain: str | None = None, storage: AbstractStorage | None = None
-    ) -> bool:
+    def initialize(self, keychain: str | None = None, storage: AbstractStorage | None = None) -> bool:
         """
         Initialize the CA Authority.
 
@@ -262,7 +260,8 @@ class Authority(Common):
 
         # Export CA key (with encryption)
         self._ca_key.export_to_file(
-            os.path.join(path, "ca.key"), password=None  # No password for now
+            os.path.join(path, "ca.key"),
+            password=None,  # No password for now
         )
 
         # Export CA certificate
@@ -414,15 +413,11 @@ class Authority(Common):
         csr = CertRequest.generate(key, cn, profile, sans)
 
         # Generate certificate
-        cert = PublicCert.generate(
-            csr, self._ca_cert, self._ca_key, profile, ca=False, duration=duration
-        )
+        cert = PublicCert.generate(csr, self._ca_cert, self._ca_key, profile, ca=False, duration=duration)
 
         # Store certificate
         if self._storage:
-            self._storage.store_cert(
-                cert.export().encode("utf-8"), cn, cert.serial_number
-            )
+            self._storage.store_cert(cert.export().encode("utf-8"), cn, cert.serial_number)
 
         # Log the certificate issuance
         self._logger.audit(
@@ -436,9 +431,7 @@ class Authority(Common):
 
         return cert
 
-    def sign_csr(
-        self, csr_pem: str, profile_name: str, duration: int | None = None
-    ) -> PublicCert:
+    def sign_csr(self, csr_pem: str, profile_name: str, duration: int | None = None) -> PublicCert:
         """
         Sign a CSR.
 
@@ -483,9 +476,7 @@ class Authority(Common):
 
         # Store certificate
         if self._storage:
-            self._storage.store_cert(
-                cert.export().encode("utf-8"), cn, cert.serial_number
-            )
+            self._storage.store_cert(cert.export().encode("utf-8"), cn, cert.serial_number)
 
         # Log the certificate issuance
         self._logger.audit(
@@ -604,9 +595,7 @@ class Authority(Common):
 
         return True
 
-    def renew_certificate(
-        self, dn: str, duration: int | None = None
-    ) -> tuple[PublicCert, int]:
+    def renew_certificate(self, dn: str, duration: int | None = None) -> tuple[PublicCert, int]:
         """
         Renew a certificate.
 
@@ -667,9 +656,7 @@ class Authority(Common):
 
         # Store new certificate
         if self._storage:
-            self._storage.store_cert(
-                new_cert.export().encode("utf-8"), cn, new_cert.serial_number
-            )
+            self._storage.store_cert(new_cert.export().encode("utf-8"), cn, new_cert.serial_number)
 
             # Update node data with new certificate info
             node_data = self._storage.get_node(dn) or {}

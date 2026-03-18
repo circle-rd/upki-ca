@@ -30,9 +30,7 @@ class Listener(Common, ABC):
     and responding to requests.
     """
 
-    def __init__(
-        self, host: str = "127.0.0.1", port: int = 5000, timeout: int = 5000
-    ) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 5000, timeout: int = 5000) -> None:
         """
         Initialize the Listener.
 

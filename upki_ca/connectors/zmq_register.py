@@ -25,9 +25,7 @@ class ZMQRegister(Listener):
     for initial RA setup.
     """
 
-    def __init__(
-        self, host: str = "127.0.0.1", port: int = 5001, seed: str | None = None
-    ) -> None:
+    def __init__(self, host: str = "127.0.0.1", port: int = 5001, seed: str | None = None) -> None:
         """
         Initialize the ZMQRegister.
 

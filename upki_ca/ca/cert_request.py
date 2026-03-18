@@ -126,29 +126,17 @@ class CertRequest(Common):
         # Build x509 Name
         name_attributes = []
         if "C" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.COUNTRY_NAME, subject_dict["C"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.COUNTRY_NAME, subject_dict["C"]))
         if "ST" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, subject_dict["ST"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.STATE_OR_PROVINCE_NAME, subject_dict["ST"]))
         if "L" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.LOCALITY_NAME, subject_dict["L"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.LOCALITY_NAME, subject_dict["L"]))
         if "O" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.ORGANIZATION_NAME, subject_dict["O"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.ORGANIZATION_NAME, subject_dict["O"]))
         if "OU" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, subject_dict["OU"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.ORGANIZATIONAL_UNIT_NAME, subject_dict["OU"]))
         if "CN" in subject_dict:
-            name_attributes.append(
-                x509.NameAttribute(NameOID.COMMON_NAME, subject_dict["CN"])
-            )
+            name_attributes.append(x509.NameAttribute(NameOID.COMMON_NAME, subject_dict["CN"]))
 
         subject = x509.Name(name_attributes)
 
@@ -222,9 +210,7 @@ class CertRequest(Common):
                     eku_oids.append(ExtendedKeyUsageOID.TIME_STAMPING)
 
             if eku_oids:
-                builder = builder.add_extension(
-                    x509.ExtendedKeyUsage(eku_oids), critical=False
-                )
+                builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
 
         # Add SANs if provided
         if sans:
@@ -245,9 +231,7 @@ class CertRequest(Common):
                     san_entries.append(x509.UniformResourceIdentifier(value))
 
             if san_entries:
-                builder = builder.add_extension(
-                    x509.SubjectAlternativeName(san_entries), critical=False
-                )
+                builder = builder.add_extension(x509.SubjectAlternativeName(san_entries), critical=False)
 
         # Sign the CSR
         try:
@@ -374,9 +358,7 @@ class CertRequest(Common):
 
         # Parse SANs
         try:
-            san_ext = self._csr.extensions.get_extension_for_oid(
-                ExtensionOID.SUBJECT_ALTERNATIVE_NAME
-            )
+            san_ext = self._csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             for san in san_ext.value:  # type: ignore[iterable]
                 if isinstance(san, x509.DNSName):
                     result["sans"].append({"type": "DNS", "value": san.value})

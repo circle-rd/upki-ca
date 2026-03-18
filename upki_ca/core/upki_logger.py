@@ -45,13 +45,9 @@ class UpkiLoggerAdapter(logging.Logger):
             **details: Additional audit details
         """
         timestamp = datetime.now(UTC).isoformat()
-        details_str = (
-            " ".join(f"{k}={v}" for k, v in details.items()) if details else ""
-        )
+        details_str = " ".join(f"{k}={v}" for k, v in details.items()) if details else ""
 
-        message = (
-            f"AUDIT | {timestamp} | {action} | {subject} | {result} | {details_str}"
-        )
+        message = f"AUDIT | {timestamp} | {action} | {subject} | {result} | {details_str}"
         self.info(message)
 
 
@@ -161,9 +157,7 @@ class UpkiLogger:
         logger.log(level, full_message)
 
     @classmethod
-    def audit(
-        cls, logger_name: str, action: str, subject: str, result: str, **details: Any
-    ) -> None:
+    def audit(cls, logger_name: str, action: str, subject: str, result: str, **details: Any) -> None:
         """
         Log an audit event.
 
@@ -177,13 +171,9 @@ class UpkiLogger:
         logger = cls.get_logger(logger_name)
 
         timestamp = datetime.now(UTC).isoformat()
-        details_str = (
-            " ".join(f"{k}={v}" for k, v in details.items()) if details else ""
-        )
+        details_str = " ".join(f"{k}={v}" for k, v in details.items()) if details else ""
 
-        message = (
-            f"AUDIT | {timestamp} | {action} | {subject} | {result} | {details_str}"
-        )
+        message = f"AUDIT | {timestamp} | {action} | {subject} | {result} | {details_str}"
         logger.info(message)
 
     @classmethod

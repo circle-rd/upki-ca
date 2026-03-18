@@ -325,9 +325,7 @@ class Profiles(Common):
 
         return True
 
-    def create_from_template(
-        self, name: str, template: str, overrides: dict[str, Any] | None = None
-    ) -> bool:
+    def create_from_template(self, name: str, template: str, overrides: dict[str, Any] | None = None) -> bool:
         """
         Create a new profile from a template.
 

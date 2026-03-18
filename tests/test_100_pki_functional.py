@@ -21,9 +21,7 @@ import sys
 import pytest
 
 # Path to the ca_server.py script
-CA_SERVER_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(__file__)), "ca_server.py"
-)
+CA_SERVER_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ca_server.py")
 
 
 class TestPKIInitialization:
@@ -597,9 +595,7 @@ class TestCertificateExtensions:
         """Generate test certificates for different profiles."""
 
         # Generate CA certificate (self-signed)
-        self.ca_cert = self._generate_self_signed_cert(
-            "/CN=uPKI Test CA/O=Test", "ca", ca=True
-        )
+        self.ca_cert = self._generate_self_signed_cert("/CN=uPKI Test CA/O=Test", "ca", ca=True)
 
         # Generate RA certificate
         self.ra_cert = self._generate_signed_cert("/CN=Test RA/O=Test", "ra")
@@ -615,9 +611,7 @@ class TestCertificateExtensions:
         # Generate Admin certificate
         self.admin_cert = self._generate_signed_cert("/CN=Test Admin/O=Test", "admin")
 
-    def _generate_self_signed_cert(
-        self, subject: str, profile_name: str, ca: bool = False
-    ) -> str:
+    def _generate_self_signed_cert(self, subject: str, profile_name: str, ca: bool = False) -> str:
         """Generate a self-signed certificate."""
         # Generate key
         key_file = os.path.join(self.pki_path, f"{profile_name}.key")
@@ -731,9 +725,7 @@ subjectKeyIdentifier=hash
         }
         return configs.get(profile, "")
 
-    def _generate_signed_cert(
-        self, subject: str, profile_name: str, domain: str = ""
-    ) -> str:
+    def _generate_signed_cert(self, subject: str, profile_name: str, domain: str = "") -> str:
         """Generate a certificate signed by the CA."""
         # Generate key
         key_file = os.path.join(self.pki_path, f"{profile_name}.key")
@@ -849,54 +841,36 @@ subjectKeyIdentifier=hash
 
         # CA should have Certificate Sign (keyCertSign) and CRL Sign (cRLSign)
         # OpenSSL displays these as "Certificate Sign" and "CRL Sign"
-        assert (
-            "Certificate Sign" in extensions
-        ), "CA certificate should have Certificate Sign"
+        assert "Certificate Sign" in extensions, "CA certificate should have Certificate Sign"
         assert "CRL Sign" in extensions, "CA certificate should have CRL Sign"
 
     def test_ra_key_usage(self):
         """Test RA certificate has digitalSignature and keyEncipherment."""
         extensions = self._get_cert_extensions(self.ra_cert)
 
-        assert (
-            "Digital Signature" in extensions
-        ), "RA certificate should have Digital Signature"
-        assert (
-            "Key Encipherment" in extensions
-        ), "RA certificate should have Key Encipherment"
+        assert "Digital Signature" in extensions, "RA certificate should have Digital Signature"
+        assert "Key Encipherment" in extensions, "RA certificate should have Key Encipherment"
 
     def test_server_key_usage(self):
         """Test server certificate has digitalSignature and keyEncipherment."""
         extensions = self._get_cert_extensions(self.server_cert)
 
-        assert (
-            "Digital Signature" in extensions
-        ), "Server certificate should have Digital Signature"
-        assert (
-            "Key Encipherment" in extensions
-        ), "Server certificate should have Key Encipherment"
+        assert "Digital Signature" in extensions, "Server certificate should have Digital Signature"
+        assert "Key Encipherment" in extensions, "Server certificate should have Key Encipherment"
 
     def test_user_key_usage(self):
         """Test user certificate has digitalSignature and nonRepudiation."""
         extensions = self._get_cert_extensions(self.user_cert)
 
-        assert (
-            "Digital Signature" in extensions
-        ), "User certificate should have Digital Signature"
-        assert (
-            "Non Repudiation" in extensions
-        ), "User certificate should have Non Repudiation"
+        assert "Digital Signature" in extensions, "User certificate should have Digital Signature"
+        assert "Non Repudiation" in extensions, "User certificate should have Non Repudiation"
 
     def test_admin_key_usage(self):
         """Test admin certificate has digitalSignature and nonRepudiation."""
         extensions = self._get_cert_extensions(self.admin_cert)
 
-        assert (
-            "Digital Signature" in extensions
-        ), "Admin certificate should have Digital Signature"
-        assert (
-            "Non Repudiation" in extensions
-        ), "Admin certificate should have Non Repudiation"
+        assert "Digital Signature" in extensions, "Admin certificate should have Digital Signature"
+        assert "Non Repudiation" in extensions, "Admin certificate should have Non Repudiation"
 
     # ========== extendedKeyUsage Tests ==========
 
@@ -904,36 +878,26 @@ subjectKeyIdentifier=hash
         """Test RA certificate has serverAuth and clientAuth."""
         extensions = self._get_cert_extensions(self.ra_cert)
 
-        assert (
-            "TLS Web Server Authentication" in extensions
-        ), "RA should have serverAuth"
-        assert (
-            "TLS Web Client Authentication" in extensions
-        ), "RA should have clientAuth"
+        assert "TLS Web Server Authentication" in extensions, "RA should have serverAuth"
+        assert "TLS Web Client Authentication" in extensions, "RA should have clientAuth"
 
     def test_server_extended_key_usage(self):
         """Test server certificate has serverAuth."""
         extensions = self._get_cert_extensions(self.server_cert)
 
-        assert (
-            "TLS Web Server Authentication" in extensions
-        ), "Server should have serverAuth"
+        assert "TLS Web Server Authentication" in extensions, "Server should have serverAuth"
 
     def test_user_extended_key_usage(self):
         """Test user certificate has clientAuth."""
         extensions = self._get_cert_extensions(self.user_cert)
 
-        assert (
-            "TLS Web Client Authentication" in extensions
-        ), "User should have clientAuth"
+        assert "TLS Web Client Authentication" in extensions, "User should have clientAuth"
 
     def test_admin_extended_key_usage(self):
         """Test admin certificate has clientAuth."""
         extensions = self._get_cert_extensions(self.admin_cert)
 
-        assert (
-            "TLS Web Client Authentication" in extensions
-        ), "Admin should have clientAuth"
+        assert "TLS Web Client Authentication" in extensions, "Admin should have clientAuth"
 
     # ========== basicConstraints Tests ==========
 
@@ -966,9 +930,7 @@ subjectKeyIdentifier=hash
             (self.admin_cert, "Admin"),
         ]:
             extensions = self._get_cert_extensions(cert)
-            assert (
-                "Subject Key Identifier" in extensions
-            ), f"{name} should have Subject Key Identifier"
+            assert "Subject Key Identifier" in extensions, f"{name} should have Subject Key Identifier"
 
     def test_subject_key_identifier_format(self):
         """Test SKI is correctly formatted (40 hex characters)."""
@@ -998,9 +960,7 @@ subjectKeyIdentifier=hash
             (self.admin_cert, "Admin"),
         ]:
             extensions = self._get_cert_extensions(cert)
-            assert (
-                "Authority Key Identifier" in extensions
-            ), f"{name} should have Authority Key Identifier"
+            assert "Authority Key Identifier" in extensions, f"{name} should have Authority Key Identifier"
 
     def test_ca_no_authority_key_identifier(self):
         """Test self-signed CA has no AKI (or keyid:always matches)."""
@@ -1013,9 +973,7 @@ subjectKeyIdentifier=hash
         """Test SAN DNS names are present."""
         extensions = self._get_cert_extensions(self.server_cert)
 
-        assert (
-            "test.example.com" in extensions
-        ), "Server certificate should have DNS SAN"
+        assert "test.example.com" in extensions, "Server certificate should have DNS SAN"
 
     def test_san_ip(self):
         """Test SAN IP addresses are present."""

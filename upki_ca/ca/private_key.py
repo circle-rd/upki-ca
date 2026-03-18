@@ -123,9 +123,7 @@ class PrivateKey(Common):
             backend = default_backend()
 
             if key_type == "rsa":
-                key = rsa.generate_private_key(
-                    public_exponent=65537, key_size=key_len, backend=backend
-                )
+                key = rsa.generate_private_key(public_exponent=65537, key_size=key_len, backend=backend)
             elif key_type == "dsa":
                 key = dsa.generate_private_key(key_size=key_len, backend=backend)
             else:
@@ -152,9 +150,7 @@ class PrivateKey(Common):
             KeyError: If key loading fails
         """
         try:
-            key = load_pem_private_key(
-                key_pem.encode("utf-8"), password=password, backend=default_backend()
-            )
+            key = load_pem_private_key(key_pem.encode("utf-8"), password=password, backend=default_backend())
             return cls(key)
         except Exception as e:
             raise KeyError(f"Failed to load private key: {e}") from e
@@ -178,9 +174,7 @@ class PrivateKey(Common):
             with open(filepath, "rb") as f:
                 key_data = f.read()
 
-            key = load_pem_private_key(
-                key_data, password=password, backend=default_backend()
-            )
+            key = load_pem_private_key(key_data, password=password, backend=default_backend())
             return cls(key)
         except FileNotFoundError as e:
             raise KeyError(f"Key file not found: {filepath}") from e
@@ -206,9 +200,7 @@ class PrivateKey(Common):
 
         try:
             if encoding.lower() == "pem":
-                encryption = (
-                    BestAvailableEncryption(password) if password else NoEncryption()
-                )
+                encryption = BestAvailableEncryption(password) if password else NoEncryption()
 
                 return self._key.private_bytes(
                     encoding=Encoding.PEM,
@@ -216,9 +208,7 @@ class PrivateKey(Common):
                     encryption_algorithm=encryption,
                 )
             elif encoding.lower() == "der":
-                encryption = (
-                    BestAvailableEncryption(password) if password else NoEncryption()
-                )
+                encryption = BestAvailableEncryption(password) if password else NoEncryption()
 
                 return self._key.private_bytes(
                     encoding=Encoding.DER,
@@ -237,9 +227,7 @@ class PrivateKey(Common):
         except Exception as e:
             raise KeyError(f"Failed to export private key: {e}") from e
 
-    def export_to_file(
-        self, filepath: str, encoding: str = "pem", password: bytes | None = None
-    ) -> bool:
+    def export_to_file(self, filepath: str, encoding: str = "pem", password: bytes | None = None) -> bool:
         """
         Export the private key to a file.
 

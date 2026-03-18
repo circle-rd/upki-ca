@@ -33,9 +33,7 @@ class FQDNValidator:
     }
 
     # RFC 1123 compliant pattern
-    LABEL_PATTERN: re.Pattern[str] = re.compile(
-        r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$"
-    )
+    LABEL_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$")
 
     @classmethod
     def validate(cls, fqdn: str) -> bool:
@@ -57,9 +55,7 @@ class FQDNValidator:
 
         # Check length (max 253 characters)
         if len(fqdn) > 253:
-            raise ValidationError(
-                "Domain name exceeds maximum length of 253 characters"
-            )
+            raise ValidationError("Domain name exceeds maximum length of 253 characters")
 
         # Check for blocked domains
         if fqdn.lower() in cls.BLOCKED_DOMAINS:
@@ -67,9 +63,7 @@ class FQDNValidator:
 
         # Check for blocked patterns (*test*, etc.)
         if "*" in fqdn and not fqdn.startswith("*."):
-            raise ValidationError(
-                "Wildcard patterns other than *.example.com are not allowed"
-            )
+            raise ValidationError("Wildcard patterns other than *.example.com are not allowed")
 
         # Split and validate each label
         labels = fqdn.split(".")
@@ -81,9 +75,7 @@ class FQDNValidator:
 
             # Check label length (max 63 characters)
             if len(label) > 63:
-                raise ValidationError(
-                    f"Domain label '{label}' exceeds maximum length of 63 characters"
-                )
+                raise ValidationError(f"Domain label '{label}' exceeds maximum length of 63 characters")
 
             # Check for valid characters (RFC 1123)
             if not cls.LABEL_PATTERN.match(label):
@@ -127,14 +119,10 @@ class SANValidator:
         r"(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"
     )
 
-    IPV6_PATTERN: re.Pattern[str] = re.compile(
-        r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
-    )
+    IPV6_PATTERN: re.Pattern[str] = re.compile(r"^(?:[0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$")
 
     # Email pattern
-    EMAIL_PATTERN: re.Pattern[str] = re.compile(
-        r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-    )
+    EMAIL_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
 
     # URI pattern
     URI_PATTERN: re.Pattern[str] = re.compile(r"^https?://[^\s]+$")
@@ -160,9 +148,7 @@ class SANValidator:
             raise ValidationError("SAN type is required")
 
         if san_type not in cls.SUPPORTED_TYPES:
-            raise ValidationError(
-                f"SAN type '{san_type}' is not supported. Allowed: {cls.SUPPORTED_TYPES}"
-            )
+            raise ValidationError(f"SAN type '{san_type}' is not supported. Allowed: {cls.SUPPORTED_TYPES}")
 
         if not value:
             raise ValidationError("SAN value is required")
@@ -242,15 +228,11 @@ class CSRValidator:
             ValidationError: If key length is insufficient
         """
         if key_length not in KeyLen:
-            raise ValidationError(
-                f"Invalid key length: {key_length}. " f"Allowed values: {KeyLen}"
-            )
+            raise ValidationError(f"Invalid key length: {key_length}. Allowed values: {KeyLen}")
 
         # Minimum RSA key length is 2048 bits
         if key_length < 2048:
-            raise ValidationError(
-                f"Key length {key_length} is below minimum (2048 bits)"
-            )
+            raise ValidationError(f"Key length {key_length} is below minimum (2048 bits)")
 
         return True
 
@@ -297,9 +279,7 @@ class DNValidator:
 
     # Pattern for Common Name - allows alphanumeric, spaces, and common DN characters
     # Based on X.520 Distinguished Name syntax
-    CN_PATTERN: re.Pattern[str] = re.compile(
-        r"^[a-zA-Z0-9][a-zA-Z0-9 \-'.(),+/@#$%&*+=:;=?\\`|<>\[\]{}~^_\"]*$"
-    )
+    CN_PATTERN: re.Pattern[str] = re.compile(r"^[a-zA-Z0-9][a-zA-Z0-9 \-'.(),+/@#$%&*+=:;=?\\`|<>\[\]{}~^_\"]*$")
 
     @classmethod
     def validate(cls, dn: dict[str, str]) -> bool:
@@ -388,9 +368,6 @@ class RevokeReasonValidator:
         reason_lower = reason.lower()
 
         if reason_lower not in [r.lower() for r in RevokeReasons]:
-            raise ValidationError(
-                f"Invalid revocation reason: {reason}. "
-                f"Allowed values: {RevokeReasons}"
-            )
+            raise ValidationError(f"Invalid revocation reason: {reason}. Allowed values: {RevokeReasons}")
 
         return True

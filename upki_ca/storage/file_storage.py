@@ -217,9 +217,7 @@ class FileStorage(AbstractStorage, Common):
         if self._serials_db is None:
             raise StorageError("Database not initialized")
 
-        self._serials_db.insert(
-            {"serial": serial, "dn": dn, "revoked": False, "revoke_reason": ""}
-        )
+        self._serials_db.insert({"serial": serial, "dn": dn, "revoked": False, "revoke_reason": ""})
         return True
 
     def get_serial(self, serial: int) -> dict[str, Any] | None:

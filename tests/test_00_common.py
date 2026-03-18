@@ -5,7 +5,6 @@ Author: uPKI Team
 License: MIT
 """
 
-
 from upki_ca.core.common import Common
 
 

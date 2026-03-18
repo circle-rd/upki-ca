@@ -64,11 +64,19 @@ pre-commit install
 
 ## Coding Standards
 
+### General Rules
+
+- **Language**: All code, comments, and documentation must be in English
+- **Naming**: Variables, functions, classes, and methods must use English names
+- **Files**: Use `snake_case` for file names (e.g., `file_storage.py`, `validators.py`)
+- **Type Hints**: All function parameters and return types must be typed
+- **Documentation**: All public functions and classes must have docstrings
+
 ### Python Style
 
 - Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) style guide
-- Use type hints where applicable
-- Maximum line length: 100 characters
+- Use type hints for all function parameters and return values
+- Line length: 120 characters (configured in `pyproject.toml`)
 - Use 4 spaces for indentation (no tabs)
 
 ### Code Quality Tools
@@ -76,35 +84,47 @@ pre-commit install
 We use the following tools to maintain code quality:
 
 - **Ruff** — Fast Python linter (configured in `pyproject.toml`)
+- **Black** — Code formatter (use `ruff format` which uses Black under the hood)
 - **pytest** — Testing framework
 - **pytest-cov** — Coverage reporting
 
 Run linting:
 
 ```bash
-ruff check upki_ca/
+ruff check upki_ca/ tests/
 ```
 
 Run formatting:
 
 ```bash
-ruff format upki_ca/
+ruff format upki_ca/ tests/
+```
+
+Run type checking (optional, for better IDE support):
+
+```bash
+mypy upki_ca/
 ```
 
 ### Naming Conventions
 
-- **Functions/Methods**: `snake_case` (e.g., `generate_certificate`)
-- **Classes**: `PascalCase` (e.g., `CertificateAuthority`)
-- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_VALIDITY_DAYS`)
-- **Private methods**: Prefix with underscore (e.g., `_internal_method`)
+- **Files**: `snake_case.py` (e.g., `file_storage.py`, `validators.py`)
+- **Functions/Methods**: `snake_case` (e.g., `generate_certificate`, `get_node`)
+- **Classes**: `PascalCase` (e.g., `CertificateAuthority`, `FileStorage`)
+- **Constants**: `UPPER_SNAKE_CASE` (e.g., `DEFAULT_VALIDITY_DAYS`, `MAX_CN_LENGTH`)
+- **Private methods/attributes**: Prefix with underscore (e.g., `_internal_method`, `_cache`)
+- **Instance variables**: `snake_case` (e.g., `self.base_path`, `self._nodes_db`)
 
 ### Docstrings
 
-Use Google-style docstrings:
+Use Google-style docstrings for all public functions, classes, and methods:
 
 ```python
 def generate_certificate(csr: str, profile: str) -> Certificate:
     """Generate a certificate from a CSR.
+
+    This function takes a Certificate Signing Request and signs it
+    using the configured certificate authority.
 
     Args:
         csr: The Certificate Signing Request in PEM format.
@@ -115,10 +135,45 @@ def generate_certificate(csr: str, profile: str) -> Certificate:
 
     Raises:
         ValidationError: If the CSR is invalid.
+        StorageError: If there is an error storing the certificate.
     """
 ```
 
+For classes:
+
+```python
+class CertificateAuthority:
+    """A Certificate Authority for issuing X.509 certificates.
+
+    This class handles all certificate lifecycle operations including
+    issuance, validation, and revocation.
+
+    Attributes:
+        name: The CA name.
+        validity_days: Default validity period in days.
+    """
+
+    def __init__(self, name: str, validity_days: int = 365) -> None:
+        """Initialize the Certificate Authority.
+
+        Args:
+            name: The CA name.
+            validity_days: Default validity period in days.
+        """
+        self.name = name
+        self.validity_days = validity_days
+```
+
 ## Testing
+
+### Test Types
+
+- **Unit Tests**: Test individual functions and methods in isolation
+  - Located in `tests/test_10_*.py` and `tests/test_20_*.py`
+  - Fast to run, no external dependencies
+- **Functional Tests**: Test complete workflows and integration
+  - Located in `tests/test_100_*.py`
+  - May take longer, test end-to-end scenarios
 
 ### Running Tests
 
@@ -134,6 +189,12 @@ pytest tests/test_100_pki_functional.py
 
 # Run tests matching a pattern
 pytest -k "test_certificate"
+
+# Run only unit tests
+pytest tests/test_10_*.py tests/test_20_*.py
+
+# Run only functional tests
+pytest tests/test_100_*.py
 ```
 
 ### Writing Tests
@@ -144,6 +205,7 @@ pytest -k "test_certificate"
 - Include docstrings for test functions
 - Test both positive and negative cases
 - Ensure test coverage for new features
+- Follow AAA pattern: Arrange, Act, Assert
 
 Example:
 

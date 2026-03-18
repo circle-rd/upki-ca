@@ -156,9 +156,7 @@ class Config(Common):
         # Validate clients mode
         clients = self._config.get("clients", "")
         if clients not in ClientModes:
-            raise ConfigurationError(
-                f"Invalid clients mode: {clients}. " f"Allowed: {ClientModes}"
-            )
+            raise ConfigurationError(f"Invalid clients mode: {clients}. Allowed: {ClientModes}")
 
         # Validate key type
         key_type = self._config.get("key_type", "rsa")
