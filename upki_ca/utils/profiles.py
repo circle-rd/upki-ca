@@ -60,8 +60,11 @@ class Profiles(Common):
             "certType": "sslCA",
         },
         "server": {
+            # Short-lived TLS certificate for internal services (Docker / Traefik).
+            # CN = FQDN of the container. SANs should include the same FQDN so that
+            # name-validation in HTTP clients works correctly.
             "keyType": "rsa",
-            "keyLen": DEFAULT_KEY_LENGTH,
+            "keyLen": 4096,
             "duration": PROFILE_DURATIONS["server"],
             "digest": DEFAULT_DIGEST,
             "altnames": True,
@@ -70,6 +73,36 @@ class Profiles(Common):
             "keyUsage": ["digitalSignature", "keyEncipherment"],
             "extendedKeyUsage": ["serverAuth"],
             "certType": "server",
+        },
+        "webapp": {
+            # mTLS certificate for web application containers behind Traefik.
+            # Both serverAuth and clientAuth are included so the container can
+            # authenticate itself to the reverse-proxy AND to peer services.
+            # CN = internal FQDN (e.g. myservice.docker.internal).
+            "keyType": "rsa",
+            "keyLen": 4096,
+            "duration": PROFILE_DURATIONS["webapp"],
+            "digest": DEFAULT_DIGEST,
+            "altnames": True,
+            "subject": {"C": "FR", "O": "Company", "OU": "WebApps", "CN": ""},
+            "keyUsage": ["digitalSignature", "keyEncipherment"],
+            "extendedKeyUsage": ["serverAuth", "clientAuth"],
+            "certType": "server",
+        },
+        "laptop": {
+            # Personal device / end-user certificate.
+            # CN = e-mail address or username (e.g. user@example.com).
+            # clientAuth enables browser/TLS mutual authentication.
+            # emailProtection enables S/MIME signing if needed.
+            "keyType": "rsa",
+            "keyLen": 4096,
+            "duration": PROFILE_DURATIONS["laptop"],
+            "digest": DEFAULT_DIGEST,
+            "altnames": True,
+            "subject": {"C": "FR", "O": "Company", "OU": "Users", "CN": ""},
+            "keyUsage": ["digitalSignature", "nonRepudiation"],
+            "extendedKeyUsage": ["clientAuth", "emailProtection"],
+            "certType": "user",
         },
         "user": {
             "keyType": "rsa",
@@ -326,7 +359,9 @@ class Profiles(Common):
 
         return True
 
-    def create_from_template(self, name: str, template: str, overrides: dict[str, Any] | None = None) -> bool:
+    def create_from_template(
+        self, name: str, template: str, overrides: dict[str, Any] | None = None
+    ) -> bool:
         """
         Create a new profile from a template.
 
