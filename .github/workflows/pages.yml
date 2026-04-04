@@ -39,7 +39,7 @@ jobs:
       - name: Create mkdocs.yml if not exists
         run: |
           if [ ! -f mkdocs.yml ]; then
-            cat > mkdocs.yml << 'EOF'
+            sed 's/^  //' << 'EOF' > mkdocs.yml
             site_name: uPKI CA Server
             site_description: Certificate Authority for PKI operations
             site_url: https://circle-rd.github.io/upki/
@@ -75,12 +75,13 @@ jobs:
               - pymdownx.details
               - pymdownx.superfences
               - pymdownx.highlight
+          EOF
           fi
 
       - name: Create index.md if not exists
         run: |
           if [ ! -f docs/index.md ]; then
-            cat > docs/index.md << 'EOF'
+            sed 's/^  //' << 'EOF' > docs/index.md
             # Welcome to uPKI CA Server
             
             A production-ready Public Key Infrastructure (PKI) and Certificate Authority system with native ZeroMQ protocol support.
@@ -90,7 +91,7 @@ jobs:
             - [ZMQ Protocol Specification](CA_ZMQ_PROTOCOL.md)
             - [CA Specifications](SPECIFICATIONS_CA.md)
             - [GitHub Repository](https://github.com/circle-rd/upki)
-            EOF
+          EOF
           fi
 
       - name: Build documentation
