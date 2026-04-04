@@ -19,9 +19,17 @@ import subprocess
 import sys
 
 import pytest
+from cryptography.x509 import (
+    DNSName,
+    IPAddress,
+    SubjectAlternativeName,
+    load_pem_x509_certificate,
+)
 
 # Path to the ca_server.py script
-CA_SERVER_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "ca_server.py")
+CA_SERVER_PATH = os.path.join(
+    os.path.dirname(os.path.dirname(__file__)), "ca_server.py"
+)
 
 
 class TestPKIInitialization:
@@ -595,7 +603,9 @@ class TestCertificateExtensions:
         """Generate test certificates for different profiles."""
 
         # Generate CA certificate (self-signed)
-        self.ca_cert = self._generate_self_signed_cert("/CN=uPKI Test CA/O=Test", "ca", ca=True)
+        self.ca_cert = self._generate_self_signed_cert(
+            "/CN=uPKI Test CA/O=Test", "ca", ca=True
+        )
 
         # Generate RA certificate
         self.ra_cert = self._generate_signed_cert("/CN=Test RA/O=Test", "ra")
@@ -611,7 +621,9 @@ class TestCertificateExtensions:
         # Generate Admin certificate
         self.admin_cert = self._generate_signed_cert("/CN=Test Admin/O=Test", "admin")
 
-    def _generate_self_signed_cert(self, subject: str, profile_name: str, ca: bool = False) -> str:
+    def _generate_self_signed_cert(
+        self, subject: str, profile_name: str, ca: bool = False
+    ) -> str:
         """Generate a self-signed certificate."""
         # Generate key
         key_file = os.path.join(self.pki_path, f"{profile_name}.key")
@@ -725,7 +737,9 @@ subjectKeyIdentifier=hash
         }
         return configs.get(profile, "")
 
-    def _generate_signed_cert(self, subject: str, profile_name: str, domain: str = "") -> str:
+    def _generate_signed_cert(
+        self, subject: str, profile_name: str, domain: str = ""
+    ) -> str:
         """Generate a certificate signed by the CA."""
         # Generate key
         key_file = os.path.join(self.pki_path, f"{profile_name}.key")
@@ -809,6 +823,26 @@ subjectKeyIdentifier=hash
         )
         return result.stdout
 
+    def _get_san_dns_names(self, cert_file: str) -> list[str]:
+        """Return the list of DNS SAN values from a PEM certificate."""
+        with open(cert_file, "rb") as fh:
+            cert = load_pem_x509_certificate(fh.read())
+        try:
+            san = cert.extensions.get_extension_for_class(SubjectAlternativeName)
+            return [n.value for n in san.value if isinstance(n, DNSName)]
+        except Exception:
+            return []
+
+    def _get_san_ip_addresses(self, cert_file: str) -> list[str]:
+        """Return the list of IP SAN values (as strings) from a PEM certificate."""
+        with open(cert_file, "rb") as fh:
+            cert = load_pem_x509_certificate(fh.read())
+        try:
+            san = cert.extensions.get_extension_for_class(SubjectAlternativeName)
+            return [str(n.value) for n in san.value if isinstance(n, IPAddress)]
+        except Exception:
+            return []
+
     def _has_extension(self, cert_file: str, extension_name: str) -> bool:
         """Check if certificate has a specific extension."""
         extensions = self._get_cert_extensions(cert_file)
@@ -841,36 +875,54 @@ subjectKeyIdentifier=hash
 
         # CA should have Certificate Sign (keyCertSign) and CRL Sign (cRLSign)
         # OpenSSL displays these as "Certificate Sign" and "CRL Sign"
-        assert "Certificate Sign" in extensions, "CA certificate should have Certificate Sign"
+        assert (
+            "Certificate Sign" in extensions
+        ), "CA certificate should have Certificate Sign"
         assert "CRL Sign" in extensions, "CA certificate should have CRL Sign"
 
     def test_ra_key_usage(self):
         """Test RA certificate has digitalSignature and keyEncipherment."""
         extensions = self._get_cert_extensions(self.ra_cert)
 
-        assert "Digital Signature" in extensions, "RA certificate should have Digital Signature"
-        assert "Key Encipherment" in extensions, "RA certificate should have Key Encipherment"
+        assert (
+            "Digital Signature" in extensions
+        ), "RA certificate should have Digital Signature"
+        assert (
+            "Key Encipherment" in extensions
+        ), "RA certificate should have Key Encipherment"
 
     def test_server_key_usage(self):
         """Test server certificate has digitalSignature and keyEncipherment."""
         extensions = self._get_cert_extensions(self.server_cert)
 
-        assert "Digital Signature" in extensions, "Server certificate should have Digital Signature"
-        assert "Key Encipherment" in extensions, "Server certificate should have Key Encipherment"
+        assert (
+            "Digital Signature" in extensions
+        ), "Server certificate should have Digital Signature"
+        assert (
+            "Key Encipherment" in extensions
+        ), "Server certificate should have Key Encipherment"
 
     def test_user_key_usage(self):
         """Test user certificate has digitalSignature and nonRepudiation."""
         extensions = self._get_cert_extensions(self.user_cert)
 
-        assert "Digital Signature" in extensions, "User certificate should have Digital Signature"
-        assert "Non Repudiation" in extensions, "User certificate should have Non Repudiation"
+        assert (
+            "Digital Signature" in extensions
+        ), "User certificate should have Digital Signature"
+        assert (
+            "Non Repudiation" in extensions
+        ), "User certificate should have Non Repudiation"
 
     def test_admin_key_usage(self):
         """Test admin certificate has digitalSignature and nonRepudiation."""
         extensions = self._get_cert_extensions(self.admin_cert)
 
-        assert "Digital Signature" in extensions, "Admin certificate should have Digital Signature"
-        assert "Non Repudiation" in extensions, "Admin certificate should have Non Repudiation"
+        assert (
+            "Digital Signature" in extensions
+        ), "Admin certificate should have Digital Signature"
+        assert (
+            "Non Repudiation" in extensions
+        ), "Admin certificate should have Non Repudiation"
 
     # ========== extendedKeyUsage Tests ==========
 
@@ -878,26 +930,36 @@ subjectKeyIdentifier=hash
         """Test RA certificate has serverAuth and clientAuth."""
         extensions = self._get_cert_extensions(self.ra_cert)
 
-        assert "TLS Web Server Authentication" in extensions, "RA should have serverAuth"
-        assert "TLS Web Client Authentication" in extensions, "RA should have clientAuth"
+        assert (
+            "TLS Web Server Authentication" in extensions
+        ), "RA should have serverAuth"
+        assert (
+            "TLS Web Client Authentication" in extensions
+        ), "RA should have clientAuth"
 
     def test_server_extended_key_usage(self):
         """Test server certificate has serverAuth."""
         extensions = self._get_cert_extensions(self.server_cert)
 
-        assert "TLS Web Server Authentication" in extensions, "Server should have serverAuth"
+        assert (
+            "TLS Web Server Authentication" in extensions
+        ), "Server should have serverAuth"
 
     def test_user_extended_key_usage(self):
         """Test user certificate has clientAuth."""
         extensions = self._get_cert_extensions(self.user_cert)
 
-        assert "TLS Web Client Authentication" in extensions, "User should have clientAuth"
+        assert (
+            "TLS Web Client Authentication" in extensions
+        ), "User should have clientAuth"
 
     def test_admin_extended_key_usage(self):
         """Test admin certificate has clientAuth."""
         extensions = self._get_cert_extensions(self.admin_cert)
 
-        assert "TLS Web Client Authentication" in extensions, "Admin should have clientAuth"
+        assert (
+            "TLS Web Client Authentication" in extensions
+        ), "Admin should have clientAuth"
 
     # ========== basicConstraints Tests ==========
 
@@ -930,7 +992,9 @@ subjectKeyIdentifier=hash
             (self.admin_cert, "Admin"),
         ]:
             extensions = self._get_cert_extensions(cert)
-            assert "Subject Key Identifier" in extensions, f"{name} should have Subject Key Identifier"
+            assert (
+                "Subject Key Identifier" in extensions
+            ), f"{name} should have Subject Key Identifier"
 
     def test_subject_key_identifier_format(self):
         """Test SKI is correctly formatted (40 hex characters)."""
@@ -960,7 +1024,9 @@ subjectKeyIdentifier=hash
             (self.admin_cert, "Admin"),
         ]:
             extensions = self._get_cert_extensions(cert)
-            assert "Authority Key Identifier" in extensions, f"{name} should have Authority Key Identifier"
+            assert (
+                "Authority Key Identifier" in extensions
+            ), f"{name} should have Authority Key Identifier"
 
     def test_ca_no_authority_key_identifier(self):
         """Test self-signed CA has no AKI (or keyid:always matches)."""
@@ -971,15 +1037,17 @@ subjectKeyIdentifier=hash
 
     def test_san_dns(self):
         """Test SAN DNS names are present."""
-        extensions = self._get_cert_extensions(self.server_cert)
-
-        assert "test.example.com" in extensions, "Server certificate should have DNS SAN"
+        dns_names = self._get_san_dns_names(self.server_cert)
+        assert any(
+            name == "test.example.com" for name in dns_names
+        ), "Server certificate should have DNS SAN"
 
     def test_san_ip(self):
         """Test SAN IP addresses are present."""
-        extensions = self._get_cert_extensions(self.server_cert)
-
-        assert "192.168.1.1" in extensions, "Server certificate should have IP SAN"
+        ip_addresses = self._get_san_ip_addresses(self.server_cert)
+        assert any(
+            addr == "192.168.1.1" for addr in ip_addresses
+        ), "Server certificate should have IP SAN"
 
     def test_profiles_without_san(self):
         """Test profiles without SAN don't have subjectAltName extension."""
@@ -988,6 +1056,470 @@ subjectKeyIdentifier=hash
         # For this test, we check that the RA cert (which doesn't have explicit SAN)
         # either has or doesn't have SAN based on profile configuration
         pass  # This is informational
+
+
+class TestSeedDisplay:
+    """Tests for seed auto-generation and display during ``init``."""
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Set up and tear down for each test."""
+        self.pki_path = "/tmp/test_pki_seed"
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+
+        yield
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+    def test_init_generates_and_displays_seed(self):
+        """Test that init auto-generates and displays a seed when none is configured."""
+        result = subprocess.run(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "init"],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"init failed:\n{result.stderr}"
+        assert (
+            "Registration seed generated" in result.stdout
+        ), f"Expected seed generation message in stdout:\n{result.stdout}"
+        assert "PKI initialized successfully" in result.stdout
+
+        # Verify a token-looking string (urlsafe base64, ≥ 20 chars) is present in output
+        import re
+
+        seed_candidates = [
+            line.strip()
+            for line in result.stdout.splitlines()
+            if re.fullmatch(r"[A-Za-z0-9_\-]{20,}", line.strip())
+        ]
+        assert seed_candidates, f"No seed token found in init output:\n{result.stdout}"
+
+    def test_init_does_not_regenerate_existing_seed(self):
+        """Test that a second init does not overwrite a seed already present in config."""
+        # First init – generates the seed
+        r1 = subprocess.run(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "init"],
+            capture_output=True,
+            text=True,
+        )
+        assert r1.returncode == 0
+        assert "Registration seed generated" in r1.stdout
+
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+        # Second init – seed already exists, no new one should be generated
+        r2 = subprocess.run(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "init"],
+            capture_output=True,
+            text=True,
+        )
+        assert r2.returncode == 0
+        assert (
+            "Registration seed generated" not in r2.stdout
+        ), f"Seed should not be regenerated on second init:\n{r2.stdout}"
+
+
+class TestCAImport:
+    """Tests for importing a pre-existing CA key/certificate during ``init``."""
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Set up and tear down for each test."""
+        self.pki_path = "/tmp/test_pki_import"
+        self.ext_dir = "/tmp/test_external_ca"
+        self._default_ca_dir = os.path.join(os.path.expanduser("~"), ".upki", "ca")
+
+        for path in [self.pki_path, self.ext_dir]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+            os.makedirs(path)
+
+        # Back up any existing CA files so other tests are not affected
+        self._ca_backup: dict[str, bytes] = {}
+        for fname in ("ca.key", "ca.crt"):
+            fpath = os.path.join(self._default_ca_dir, fname)
+            if os.path.exists(fpath):
+                with open(fpath, "rb") as f:
+                    self._ca_backup[fname] = f.read()
+
+        yield
+
+        # Restore the original CA files
+        for fname, content in self._ca_backup.items():
+            fpath = os.path.join(self._default_ca_dir, fname)
+            os.makedirs(self._default_ca_dir, exist_ok=True)
+            with open(fpath, "wb") as f:
+                f.write(content)
+        if "ca.key" in self._ca_backup:
+            os.chmod(os.path.join(self._default_ca_dir, "ca.key"), 0o600)
+
+        for path in [self.pki_path, self.ext_dir]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+    def _make_ca(
+        self, key_path: str, cert_path: str, subj: str = "/CN=Imported Root CA"
+    ) -> None:
+        """Generate a CA key and self-signed cert using openssl."""
+        subprocess.run(
+            ["openssl", "genrsa", "-out", key_path, "2048"],
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "openssl",
+                "req",
+                "-new",
+                "-x509",
+                "-key",
+                key_path,
+                "-out",
+                cert_path,
+                "-days",
+                "3650",
+                "-subj",
+                subj,
+                "-addext",
+                "basicConstraints=critical,CA:TRUE",
+                "-addext",
+                "keyUsage=critical,keyCertSign,cRLSign",
+            ],
+            capture_output=True,
+            check=True,
+        )
+
+    def test_import_existing_ca(self):
+        """Test initializing PKI by importing an existing CA key/cert pair."""
+        key_path = os.path.join(self.ext_dir, "ext_ca.key")
+        cert_path = os.path.join(self.ext_dir, "ext_ca.crt")
+        self._make_ca(key_path, cert_path, subj="/CN=External Root CA/O=TestOrg")
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                CA_SERVER_PATH,
+                "--path",
+                self.pki_path,
+                "init",
+                "--ca-key",
+                key_path,
+                "--ca-cert",
+                cert_path,
+                "--ca-password",
+                "",  # empty = unencrypted key
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert result.returncode == 0, f"init failed:\n{result.stderr}\n{result.stdout}"
+        assert "PKI initialized successfully" in result.stdout
+
+        # The imported CA cert must be present in the managed location
+        default_ca_cert = os.path.join(os.path.expanduser("~"), ".upki", "ca", "ca.crt")
+        assert os.path.exists(default_ca_cert)
+
+        # Verify subject is preserved from the imported cert
+        subj_result = subprocess.run(
+            ["openssl", "x509", "-in", default_ca_cert, "-noout", "-subject"],
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        assert (
+            "External Root CA" in subj_result.stdout
+        ), f"Imported CA subject not found: {subj_result.stdout}"
+
+    def test_import_encrypted_ca_key(self):
+        """Test importing a CA whose private key is protected with a password."""
+        enc_key = os.path.join(self.ext_dir, "enc_ca.key")
+        cert_path = os.path.join(self.ext_dir, "enc_ca.crt")
+
+        subprocess.run(
+            [
+                "openssl",
+                "genrsa",
+                "-aes256",
+                "-passout",
+                "pass:supersecret",
+                "-out",
+                enc_key,
+                "2048",
+            ],
+            capture_output=True,
+            check=True,
+        )
+        subprocess.run(
+            [
+                "openssl",
+                "req",
+                "-new",
+                "-x509",
+                "-key",
+                enc_key,
+                "-passin",
+                "pass:supersecret",
+                "-out",
+                cert_path,
+                "-days",
+                "3650",
+                "-subj",
+                "/CN=Encrypted CA",
+            ],
+            capture_output=True,
+            check=True,
+        )
+
+        result = subprocess.run(
+            [
+                sys.executable,
+                CA_SERVER_PATH,
+                "--path",
+                self.pki_path,
+                "init",
+                "--ca-key",
+                enc_key,
+                "--ca-cert",
+                cert_path,
+                "--ca-password",
+                "supersecret",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert (
+            result.returncode == 0
+        ), f"init with encrypted key failed:\n{result.stderr}\n{result.stdout}"
+        assert "PKI initialized successfully" in result.stdout
+
+    def test_import_mismatched_key_and_cert_fails(self):
+        """Test that init fails when the CA private key and certificate do not match."""
+        key1 = os.path.join(self.ext_dir, "ca1.key")
+        cert1 = os.path.join(self.ext_dir, "ca1.crt")
+        key2 = os.path.join(self.ext_dir, "ca2.key")
+        self._make_ca(key1, cert1)
+        # Generate an independent second key (different from the one used for cert1)
+        subprocess.run(
+            ["openssl", "genrsa", "-out", key2, "2048"],
+            capture_output=True,
+            check=True,
+        )
+
+        # key2 + cert1 → public keys do not match → must fail
+        result = subprocess.run(
+            [
+                sys.executable,
+                CA_SERVER_PATH,
+                "--path",
+                self.pki_path,
+                "init",
+                "--ca-key",
+                key2,
+                "--ca-cert",
+                cert1,
+                "--ca-password",
+                "",
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert (
+            result.returncode != 0
+        ), "init must fail when the CA key and cert do not correspond"
+
+    def test_init_requires_both_ca_key_and_ca_cert(self):
+        """Test that --ca-key without --ca-cert (and vice versa) is rejected."""
+        key_path = os.path.join(self.ext_dir, "ca.key")
+        subprocess.run(
+            ["openssl", "genrsa", "-out", key_path, "2048"],
+            capture_output=True,
+            check=True,
+        )
+
+        # Only --ca-key, no --ca-cert
+        result = subprocess.run(
+            [
+                sys.executable,
+                CA_SERVER_PATH,
+                "--path",
+                self.pki_path,
+                "init",
+                "--ca-key",
+                key_path,
+            ],
+            capture_output=True,
+            text=True,
+            input="",
+        )
+        assert result.returncode != 0, "Must fail when only --ca-key is given"
+        assert "--ca-key and --ca-cert" in result.stderr
+
+
+class TestSubCAChain:
+    """Tests for intermediate (sub-CA) certificate generation and chain validation."""
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Set up and tear down for each test."""
+        self.root_pki_path = "/tmp/test_pki_subca_root"
+        self.sub_pki_path = "/tmp/test_pki_subca_sub"
+        self._default_ca_dir = os.path.join(os.path.expanduser("~"), ".upki", "ca")
+
+        for path in [self.root_pki_path, self.sub_pki_path]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+
+        # Back up any existing CA files to prevent cross-test contamination
+        self._ca_backup: dict[str, bytes] = {}
+        for fname in ("ca.key", "ca.crt"):
+            fpath = os.path.join(self._default_ca_dir, fname)
+            if os.path.exists(fpath):
+                with open(fpath, "rb") as f:
+                    self._ca_backup[fname] = f.read()
+
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+        yield
+
+        # Restore original CA files
+        for fname, content in self._ca_backup.items():
+            fpath = os.path.join(self._default_ca_dir, fname)
+            os.makedirs(self._default_ca_dir, exist_ok=True)
+            with open(fpath, "wb") as f:
+                f.write(content)
+        if "ca.key" in self._ca_backup:
+            os.chmod(os.path.join(self._default_ca_dir, "ca.key"), 0o600)
+
+        for path in [self.root_pki_path, self.sub_pki_path]:
+            if os.path.exists(path):
+                shutil.rmtree(path)
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+    def test_sub_ca_has_correct_basic_constraints(self):
+        """Sub-CA generated via the 'ca' profile must have BasicConstraints(CA:TRUE, pathLen:0)."""
+        from upki_ca.ca.authority import Authority
+        from upki_ca.storage.file_storage import FileStorage
+
+        storage = FileStorage(self.root_pki_path)
+        storage.initialize()
+        authority = Authority.get_instance()
+        authority.initialize(storage=storage, keychain=self.root_pki_path)
+
+        sub_ca_cert = authority.generate_certificate("sub-ca.example.com", "ca")
+        bc = sub_ca_cert.basic_constraints
+
+        assert bc["ca"] is True, "Sub-CA certificate must have CA:TRUE"
+        assert (
+            bc["path_length"] == 0
+        ), f"Sub-CA certificate must have pathLen:0 (got {bc['path_length']})"
+
+    def test_sub_ca_key_is_stored_after_generation(self):
+        """Private key of a generated certificate must be retrievable from storage."""
+        from upki_ca.ca.authority import Authority
+        from upki_ca.storage.file_storage import FileStorage
+
+        storage = FileStorage(self.root_pki_path)
+        storage.initialize()
+        authority = Authority.get_instance()
+        authority.initialize(storage=storage, keychain=self.root_pki_path)
+
+        authority.generate_certificate("sub-ca.example.com", "ca")
+        key_data = storage.get_key("sub-ca.example.com")
+        assert (
+            key_data is not None
+        ), "Sub-CA private key must be retrievable from storage"
+
+    def test_sub_ca_chain_validates_with_openssl(self):
+        """Root CA → Sub-CA → Leaf certificate chain must validate with openssl verify."""
+        from upki_ca.ca.authority import Authority
+        from upki_ca.storage.file_storage import FileStorage
+
+        # --- Root CA setup ---
+        root_storage = FileStorage(self.root_pki_path)
+        root_storage.initialize()
+        root_authority = Authority.get_instance()
+        # Use root_pki_path as the keychain directory to stay fully isolated from
+        # ~/.upki/ca/ which may be in an arbitrary state from previous test runs.
+        root_authority.initialize(storage=root_storage, keychain=self.root_pki_path)
+
+        root_ca_path = os.path.join(self.root_pki_path, "root_ca.crt")
+        with open(root_ca_path, "w") as f:
+            f.write(root_authority.get_ca_certificate())
+
+        # --- Generate sub-CA (signed by root CA) ---
+        sub_ca_cert_obj = root_authority.generate_certificate(
+            "sub-ca.example.com", "ca"
+        )
+        sub_ca_cert_path = os.path.join(self.root_pki_path, "sub_ca.crt")
+        with open(sub_ca_cert_path, "w") as f:
+            f.write(sub_ca_cert_obj.export())
+
+        sub_ca_key_data = root_storage.get_key("sub-ca.example.com")
+        assert sub_ca_key_data is not None
+        sub_ca_key_path = os.path.join(self.root_pki_path, "sub_ca.key")
+        with open(sub_ca_key_path, "wb") as f:
+            f.write(sub_ca_key_data)
+
+        # Sub-CA must be directly verifiable against root CA
+        r = subprocess.run(
+            ["openssl", "verify", "-CAfile", root_ca_path, sub_ca_cert_path],
+            capture_output=True,
+            text=True,
+        )
+        assert r.returncode == 0, f"Sub-CA not signed by root CA:\n{r.stderr}"
+
+        # --- Sub-CA Authority (imported from the generated key/cert) ---
+        Authority.reset_instance()
+        sub_storage = FileStorage(self.sub_pki_path)
+        sub_storage.initialize()
+        sub_authority = Authority.get_instance()
+        sub_authority.initialize(
+            storage=sub_storage,
+            keychain=self.sub_pki_path,  # isolate from the global ~/.upki/ca/ directory
+            import_key=sub_ca_key_path,
+            import_cert=sub_ca_cert_path,
+        )
+
+        # --- Leaf certificate signed by sub-CA ---
+        leaf_cert_obj = sub_authority.generate_certificate(
+            "server.example.com", "server"
+        )
+        leaf_cert_path = os.path.join(self.sub_pki_path, "leaf.crt")
+        with open(leaf_cert_path, "w") as f:
+            f.write(leaf_cert_obj.export())
+
+        # Full chain: Root CA → Sub-CA (untrusted) → Leaf
+        r = subprocess.run(
+            [
+                "openssl",
+                "verify",
+                "-CAfile",
+                root_ca_path,
+                "-untrusted",
+                sub_ca_cert_path,
+                leaf_cert_path,
+            ],
+            capture_output=True,
+            text=True,
+        )
+        assert (
+            r.returncode == 0
+        ), f"Full chain (Root → Sub-CA → Leaf) validation failed:\n{r.stderr}"
 
 
 # Run tests if executed directly

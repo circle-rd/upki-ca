@@ -105,13 +105,23 @@ class Authority(Common):
         """Get the profiles manager."""
         return self._profiles
 
-    def initialize(self, keychain: str | None = None, storage: AbstractStorage | None = None) -> bool:
+    def initialize(
+        self,
+        keychain: str | None = None,
+        storage: AbstractStorage | None = None,
+        import_key: str | None = None,
+        import_cert: str | None = None,
+        import_password: bytes | None = None,
+    ) -> bool:
         """
         Initialize the CA Authority.
 
         Args:
             keychain: Path to CA keychain directory or None for default
             storage: Storage backend to use
+            import_key: Path to an existing CA private key (PEM) to import.
+            import_cert: Path to an existing CA certificate (PEM) to import.
+            import_password: Optional password to decrypt the imported CA private key.
 
         Returns:
             bool: True if initialization successful
@@ -138,14 +148,16 @@ class Authority(Common):
             if not self._storage.connect():
                 raise AuthorityError("Failed to connect to storage")
 
-            # Initialize profiles
+            # Initialize profiles and load defaults + any stored overrides
             self._profiles = Profiles(self._storage)
+            self._profiles.load()
 
             # Load or generate CA keychain
-            if keychain:
-                self._load_keychain(keychain)
+            dest = keychain or self.get_ca_dir()
+            if import_key and import_cert:
+                self._import_keychain(import_key, import_cert, dest, import_password)
             else:
-                self._load_keychain(self.get_ca_dir())
+                self._load_keychain(dest)
 
             # Load CRL from storage
             self._load_crl()
@@ -191,6 +203,70 @@ class Authority(Common):
 
         except Exception as e:
             raise AuthorityError(f"Failed to load Authority: {e}") from e
+
+    def _import_keychain(
+        self,
+        key_path: str,
+        cert_path: str,
+        dest_path: str,
+        password: bytes | None = None,
+    ) -> None:
+        """
+        Import an existing CA keychain from disk.
+
+        The private key and certificate are loaded, their correspondence is
+        verified, and both files are copied to the managed keychain directory
+        and persisted in the storage backend.
+
+        Args:
+            key_path: Path to the CA private key file (PEM, optionally encrypted).
+            cert_path: Path to the CA certificate file (PEM).
+            dest_path: Destination directory where the CA files will be stored.
+            password: Optional password to decrypt the private key.
+
+        Raises:
+            AuthorityError: If a file is missing, cannot be parsed, or the key
+                and certificate public keys do not match.
+        """
+        if not os.path.exists(key_path):
+            raise AuthorityError(f"CA private key file not found: {key_path}")
+        if not os.path.exists(cert_path):
+            raise AuthorityError(f"CA certificate file not found: {cert_path}")
+
+        self._logger.info(f"Importing CA keychain from {key_path} and {cert_path}")
+
+        self._ca_key = PrivateKey.load_from_file(key_path, password=password)
+        self._ca_cert = PublicCert.load_from_file(cert_path)
+
+        # Verify that the private key corresponds to the certificate's public key
+        key_pub = self._ca_key.public_key.public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        cert_pub = self._ca_cert.cert.public_key().public_bytes(
+            serialization.Encoding.PEM,
+            serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        if key_pub != cert_pub:
+            raise AuthorityError(
+                "CA private key and certificate do not match: their public keys differ"
+            )
+
+        # Copy to the managed keychain directory (unencrypted, consistent with _generate_ca)
+        self.ensure_dir(dest_path)
+        self._ca_key.export_to_file(os.path.join(dest_path, "ca.key"))
+        self._ca_cert.export_to_file(os.path.join(dest_path, "ca.crt"))
+
+        # Persist in the storage backend
+        if self._storage:
+            self._storage.store_key(self._ca_key.export(), "ca")
+            self._storage.store_cert(
+                self._ca_cert.export().encode("utf-8"),
+                "ca",
+                self._ca_cert.serial_number,
+            )
+
+        self._logger.info(f"CA imported successfully – subject: {self._ca_cert.subject_cn}")
 
     def _load_keychain(self, path: str) -> None:
         """
@@ -412,11 +488,16 @@ class Authority(Common):
         # Generate CSR
         csr = CertRequest.generate(key, cn, profile, sans)
 
-        # Generate certificate
-        cert = PublicCert.generate(csr, self._ca_cert, self._ca_key, profile, ca=False, duration=duration)
+        # A certificate is a CA cert if and only if its profile grants the key-signing
+        # key usage (keyCertSign).  This drives BasicConstraints(ca=True/False).
+        is_ca = "keyCertSign" in profile.get("keyUsage", [])
 
-        # Store certificate
+        # Generate certificate
+        cert = PublicCert.generate(csr, self._ca_cert, self._ca_key, profile, ca=is_ca, duration=duration)
+
+        # Store key and certificate so they can be retrieved later (e.g. for sub-CA use)
         if self._storage:
+            self._storage.store_key(key.export(), cn)
             self._storage.store_cert(cert.export().encode("utf-8"), cn, cert.serial_number)
 
         # Log the certificate issuance

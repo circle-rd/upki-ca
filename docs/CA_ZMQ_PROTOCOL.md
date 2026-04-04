@@ -94,6 +94,32 @@ The following tasks are available via the main ZMQ listener on port 5000:
 | [`list_admins`](upki_ca/connectors/zmq_listener.py:129)   | none            | none                                                | list of admin DNs           |
 | [`add_admin`](upki_ca/connectors/zmq_listener.py:133)     | `dn`            | none                                                | boolean                     |
 | [`remove_admin`](upki_ca/connectors/zmq_listener.py:147)  | `dn`            | none                                                | boolean                     |
+| [`list_nodes`](upki_ca/connectors/zmq_listener.py:182)    | none            | none                                                | list of node dicts          |
+| [`get_node`](upki_ca/connectors/zmq_listener.py:182)      | `cn`            | none                                                | node details dict           |
+
+---
+
+## Port 5000 - ACME Operations
+
+The following tasks are available for ACME protocol synchronization:
+
+### Task Reference Table
+
+| Task                            | Required Params                                              | Optional Params                     | Response                |
+| ------------------------------- | ------------------------------------------------------------ | ----------------------------------- | ----------------------- |
+| `acme_sync_account`             | `account_id`, `jwk`                                          | `contact`, `status`, `created_at`   | boolean                 |
+| `acme_get_account`              | `account_id`                                                 | none                                | account data dict       |
+| `acme_list_accounts`            | none                                                         | none                                | list of account dicts   |
+| `acme_deactivate_account`       | `account_id`                                                 | none                                | boolean                 |
+| `acme_sync_order`               | `order_id`, `account_id`, `identifiers`                      | `status`, `not_before`, `not_after` | boolean                 |
+| `acme_get_order`                | `order_id`                                                   | none                                | order data dict         |
+| `acme_list_orders`              | `account_id`                                                 | none                                | list of order dicts     |
+| `acme_sync_authorization`       | `auth_id`, `order_id`, `identifier_type`, `identifier_value` | `status`                            | boolean                 |
+| `acme_get_authorization`        | `auth_id`                                                    | none                                | authorization data dict |
+| `acme_deactivate_authorization` | `auth_id`                                                    | none                                | boolean                 |
+| `acme_issue_certificate`        | `order_id`, `csr`                                            | `profile`                           | `{certificate, serial}` |
+| `acme_get_certificate`          | `cert_id`                                                    | none                                | certificate data dict   |
+| `acme_revoke_certificate`       | `certificate`                                                | `reason`                            | boolean                 |
 
 ---
 
@@ -772,6 +798,307 @@ The following tasks are available via the registration ZMQ listener on port 5001
 ```
 
 ---
+
+## ACME Operations Detail
+
+This section documents the ACME-specific tasks for synchronizing ACME data between the RA and CA.
+
+### Account Operations
+
+#### 1. `acme_sync_account` - Synchronize ACME Account
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_sync_account",
+  "params": {
+    "account_id": "abc123...",
+    "jwk": { "kty": "RSA", "n": "...", "e": "AQAB" },
+    "contact": ["mailto:admin@example.com"],
+    "status": "valid",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter    | Type   | Required | Description                       |
+| ------------ | ------ | -------- | --------------------------------- |
+| `account_id` | string | Yes      | Unique account identifier         |
+| `jwk`        | object | Yes      | JSON Web Key                      |
+| `contact`    | array  | No       | Contact email addresses           |
+| `status`     | string | No       | Account status (default: "valid") |
+| `created_at` | string | No       | Creation timestamp                |
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": true
+}
+```
+
+#### 2. `acme_get_account` - Get ACME Account
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_get_account",
+  "params": {
+    "account_id": "abc123..."
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": {
+    "id": "abc123...",
+    "jwk": { "kty": "RSA", "n": "...", "e": "AQAB" },
+    "contact": ["mailto:admin@example.com"],
+    "status": "valid",
+    "created_at": "2024-01-15T10:30:00Z"
+  }
+}
+```
+
+#### 3. `acme_list_accounts` - List ACME Accounts
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_list_accounts",
+  "params": {}
+}
+```
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": [
+    {
+      "id": "abc123...",
+      "jwk": {...},
+      "contact": ["mailto:admin@example.com"],
+      "status": "valid",
+      "created_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}
+```
+
+### Order Operations
+
+#### 4. `acme_sync_order` - Synchronize ACME Order
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_sync_order",
+  "params": {
+    "order_id": "order_123...",
+    "account_id": "abc123...",
+    "identifiers": [{ "type": "dns", "value": "example.com" }],
+    "status": "pending",
+    "not_before": "2024-01-15T10:30:00Z",
+    "not_after": "2024-12-31T23:59:59Z"
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter     | Type   | Required | Description             |
+| ------------- | ------ | -------- | ----------------------- |
+| `order_id`    | string | Yes      | Unique order identifier |
+| `account_id`  | string | Yes      | Associated account ID   |
+| `identifiers` | array  | Yes      | Certificate identifiers |
+| `status`      | string | No       | Order status            |
+| `not_before`  | string | No       | Validity start time     |
+| `not_after`   | string | No       | Validity end time       |
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": true
+}
+```
+
+#### 5. `acme_get_order` - Get ACME Order
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_get_order",
+  "params": {
+    "order_id": "order_123..."
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": {
+    "id": "order_123...",
+    "account_id": "abc123...",
+    "identifiers": [{ "type": "dns", "value": "example.com" }],
+    "status": "valid",
+    "not_before": "2024-01-15T10:30:00Z",
+    "not_after": "2024-12-31T23:59:59Z",
+    "certificate": "-----BEGIN CERTIFICATE-----"
+  }
+}
+```
+
+### Authorization Operations
+
+#### 6. `acme_sync_authorization` - Synchronize ACME Authorization
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_sync_authorization",
+  "params": {
+    "auth_id": "auth_123...",
+    "order_id": "order_123...",
+    "identifier_type": "dns",
+    "identifier_value": "example.com",
+    "status": "valid"
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter          | Type   | Required | Description                     |
+| ------------------ | ------ | -------- | ------------------------------- |
+| `auth_id`          | string | Yes      | Unique authorization identifier |
+| `order_id`         | string | Yes      | Associated order ID             |
+| `identifier_type`  | string | Yes      | Identifier type (dns, ip)       |
+| `identifier_value` | string | Yes      | Identifier value                |
+| `status`           | string | No       | Authorization status            |
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": true
+}
+```
+
+### Certificate Operations
+
+#### 7. `acme_issue_certificate` - Issue Certificate for ACME Order
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_issue_certificate",
+  "params": {
+    "order_id": "order_123...",
+    "csr": "-----BEGIN CERTIFICATE REQUEST-----",
+    "profile": "server"
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter  | Type   | Required | Description                 |
+| ---------- | ------ | -------- | --------------------------- |
+| `order_id` | string | Yes      | Associated order ID         |
+| `csr`      | string | Yes      | Certificate Signing Request |
+| `profile`  | string | No       | Certificate profile         |
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": {
+    "certificate": "-----BEGIN CERTIFICATE-----",
+    "serial": "1234567890"
+  }
+}
+```
+
+#### 8. `acme_get_certificate` - Get ACME Certificate
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_get_certificate",
+  "params": {
+    "cert_id": "order_123..."
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": {
+    "certificate": "-----BEGIN CERTIFICATE-----",
+    "serial": "1234567890",
+    "order_id": "order_123...",
+    "not_before": "2024-01-15T10:30:00Z",
+    "not_after": "2024-12-31T23:59:59Z"
+  }
+}
+```
+
+#### 9. `acme_revoke_certificate` - Revoke ACME Certificate
+
+**Request:**
+
+```json
+{
+  "TASK": "acme_revoke_certificate",
+  "params": {
+    "certificate": "-----BEGIN CERTIFICATE-----",
+    "reason": 0
+  }
+}
+```
+
+**Parameters:**
+
+| Parameter     | Type    | Required | Description                   |
+| ------------- | ------- | -------- | ----------------------------- |
+| `certificate` | string  | Yes      | Certificate to revoke         |
+| `reason`      | integer | No       | Revocation reason code (0-10) |
+
+**Response:**
+
+```json
+{
+  "EVENT": "ANSWER",
+  "DATA": true
+}
+```
 
 ## Error Handling
 

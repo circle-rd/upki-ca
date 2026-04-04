@@ -96,7 +96,9 @@ PROFILE_CERT_TYPES: Final[dict[str, str]] = {
 PROFILE_DURATIONS: Final[dict[str, int]] = {
     "ca": 3650,  # 10 years
     "ra": 365,  # 1 year
-    "server": 365,  # 1 year
+    "server": 60,  # 2 months — short-lived, suited for automated renewal
+    "webapp": 60,  # 2 months — service-to-service mTLS behind Traefik
+    "laptop": 30,  # 1 month  — personal device / user cert
     "user": 30,  # 30 days
     "admin": 365,  # 1 year
 }

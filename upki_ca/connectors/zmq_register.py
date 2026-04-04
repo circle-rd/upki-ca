@@ -10,11 +10,14 @@ License: MIT
 
 from __future__ import annotations
 
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from upki_ca.connectors.listener import Listener
 from upki_ca.core.upki_error import CommunicationError
 from upki_ca.core.upki_logger import UpkiLogger
+
+if TYPE_CHECKING:
+    from upki_ca.ca.authority import Authority
 
 
 class ZMQRegister(Listener):
@@ -25,7 +28,13 @@ class ZMQRegister(Listener):
     for initial RA setup.
     """
 
-    def __init__(self, host: str = "127.0.0.1", port: int = 5001, seed: str | None = None) -> None:
+    def __init__(
+        self,
+        host: str = "127.0.0.1",
+        port: int = 5001,
+        seed: str | None = None,
+        authority: Authority | None = None,
+    ) -> None:
         """
         Initialize the ZMQRegister.
 
@@ -33,12 +42,14 @@ class ZMQRegister(Listener):
             host: Host to bind to
             port: Port to bind to
             seed: Registration seed for validation
+            authority: CA Authority instance used to generate RA certificates
         """
         super().__init__(host, port)
 
         self._seed = seed or "default_seed"
         self._logger = UpkiLogger.get_logger("zmq_register")
         self._registered_nodes: dict[str, dict[str, Any]] = {}
+        self._authority = authority
 
     def _handle_task(self, task: str, params: dict[str, Any]) -> Any:
         """
@@ -62,11 +73,16 @@ class ZMQRegister(Listener):
         """
         Register a new RA node.
 
+        When an Authority is available a certificate is generated immediately
+        and returned alongside the private key and the CA certificate so the
+        RA can bootstrap its TLS identity in a single round-trip.
+
         Args:
             params: Registration parameters
 
         Returns:
-            dict: Registration result
+            dict: Registration result, including certificate, private_key and
+                  ca_certificate when Authority is available.
         """
         seed = params.get("seed", "")
         cn = params.get("cn", "")
@@ -86,9 +102,36 @@ class ZMQRegister(Listener):
             "registered_at": self.timestamp(),
         }
 
+        result: dict[str, Any] = {"status": "registered", "cn": cn, "profile": profile}
+
+        if self._authority is not None:
+            try:
+                cert = self._authority.generate_certificate(cn, profile)
+
+                # Retrieve the private key that generate_certificate stored
+                key_bytes = (
+                    self._authority.storage.get_key(cn)
+                    if self._authority.storage
+                    else None
+                )
+
+                result["certificate"] = cert.export()
+                if key_bytes is not None:
+                    result["private_key"] = (
+                        key_bytes.decode("utf-8")
+                        if isinstance(key_bytes, bytes)
+                        else key_bytes
+                    )
+                if self._authority.ca_cert is not None:
+                    result["ca_certificate"] = self._authority.ca_cert.export()
+
+            except Exception as e:
+                self._logger.error(f"Certificate generation failed for {cn}: {e}")
+                raise CommunicationError(f"Certificate generation failed: {e}") from e
+
         self._logger.info(f"Registered RA node: {cn}")
 
-        return {"status": "registered", "cn": cn, "profile": profile}
+        return result
 
     def _get_status(self, params: dict[str, Any]) -> dict[str, Any]:
         """

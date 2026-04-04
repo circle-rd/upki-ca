@@ -175,7 +175,9 @@ class PublicCert(Common):
 
         result = []
         try:
-            san_ext = self._cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            san_ext = self._cert.extensions.get_extension_for_oid(
+                ExtensionOID.SUBJECT_ALTERNATIVE_NAME
+            )
             # Iterate over the SAN values - type ignore needed as ExtensionType value isn't properly typed
             for san in san_ext.value:  # type: ignore[iterable]
                 if isinstance(san, x509.DNSName):
@@ -198,7 +200,9 @@ class PublicCert(Common):
             raise CertificateError("No certificate loaded")
 
         try:
-            ext = self._cert.extensions.get_extension_for_oid(ExtensionOID.BASIC_CONSTRAINTS)
+            ext = self._cert.extensions.get_extension_for_oid(
+                ExtensionOID.BASIC_CONSTRAINTS
+            )
             # Access specific BasicConstraints attributes - type ignore needed due to cryptography type stubs
             return {"ca": ext.value.ca, "path_length": ext.value.path_length}  # type: ignore[attr-defined]
         except x509.ExtensionNotFound:
@@ -285,11 +289,19 @@ class PublicCert(Common):
             .not_valid_after(end)
         )
 
-        # Add basic constraints for CA certificates
+        # Add basic constraints
         if ca:
-            builder = builder.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            # pathLen=None means unlimited chain depth (suitable for a root CA).
+            # Sub-CAs generated with a profile that specifies pathLen=0 can only
+            # sign leaf certificates, not further CAs.
+            path_len: int | None = profile.get("pathLen")
+            builder = builder.add_extension(
+                x509.BasicConstraints(ca=True, path_length=path_len), critical=True
+            )
         else:
-            builder = builder.add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            builder = builder.add_extension(
+                x509.BasicConstraints(ca=False, path_length=None), critical=True
+            )
 
         # Add key usage
         key_usages = profile.get("keyUsage", [])
@@ -324,7 +336,9 @@ class PublicCert(Common):
                     eku_oids.append(ExtendedKeyUsageOID.TIME_STAMPING)
 
             if eku_oids:
-                builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)
+                builder = builder.add_extension(
+                    x509.ExtendedKeyUsage(eku_oids), critical=False
+                )
 
         # Add SANs from CSR or parameters
         all_sans = []
@@ -357,7 +371,9 @@ class PublicCert(Common):
                 elif san_type == "URI":
                     san_entries.append(x509.UniformResourceIdentifier(value))
 
-            builder = builder.add_extension(x509.SubjectAlternativeName(san_entries), critical=False)
+            builder = builder.add_extension(
+                x509.SubjectAlternativeName(san_entries), critical=False
+            )
 
         # Sign the certificate
         try:
@@ -386,7 +402,9 @@ class PublicCert(Common):
             CertificateError: If certificate loading fails
         """
         try:
-            cert = x509.load_pem_x509_certificate(cert_pem.encode("utf-8"), default_backend())
+            cert = x509.load_pem_x509_certificate(
+                cert_pem.encode("utf-8"), default_backend()
+            )
             return cls(cert)
         except Exception as e:
             raise CertificateError(f"Failed to load certificate: {e}") from e
@@ -414,7 +432,9 @@ class PublicCert(Common):
         except Exception as e:
             raise CertificateError(f"Failed to load certificate from file: {e}") from e
 
-    def export(self, cert: x509.Certificate | None = None, encoding: str = "pem") -> str:
+    def export(
+        self, cert: x509.Certificate | None = None, encoding: str = "pem"
+    ) -> str:
         """
         Export the certificate.
 
@@ -466,7 +486,9 @@ class PublicCert(Common):
         except Exception as e:
             raise CertificateError(f"Failed to export certificate to file: {e}") from e
 
-    def verify(self, issuer_cert: PublicCert | None = None, issuer_public_key: Any = None) -> bool:
+    def verify(
+        self, issuer_cert: PublicCert | None = None, issuer_public_key: Any = None
+    ) -> bool:
         """
         Verify the certificate signature.
 
