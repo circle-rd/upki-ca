@@ -156,7 +156,9 @@ class Config(Common):
         # Validate clients mode
         clients = self._config.get("clients", "")
         if clients not in ClientModes:
-            raise ConfigurationError(f"Invalid clients mode: {clients}. Allowed: {ClientModes}")
+            raise ConfigurationError(
+                f"Invalid clients mode: {clients}. Allowed: {ClientModes}"
+            )
 
         # Validate key type
         key_type = self._config.get("key_type", "rsa")
@@ -186,6 +188,10 @@ class Config(Common):
     def get_host(self) -> str:
         """Get the listening host."""
         return self._config.get("host", "127.0.0.1")
+
+    def set_host(self, host: str) -> bool:
+        """Set the listening host."""
+        return self.set("host", host)
 
     def get_port(self) -> int:
         """Get the listening port."""
