@@ -22,8 +22,11 @@ RUN poetry config virtualenvs.create false \
 # Copy application code
 COPY . .
 
-# Expose port
-EXPOSE 6666
+# Expose ZMQ ports (CA listener + registration listener)
+EXPOSE 5000 5001
 
-# Run the CA server
-CMD ["python", "ca_server.py"]
+HEALTHCHECK --interval=10s --timeout=5s --start-period=30s --retries=10 \
+    CMD python -c "import socket; s=socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 5000)); s.close()"
+
+# Default command: auto-bootstrap (init on first boot) + run both listeners
+CMD ["python", "ca_server.py", "start"]

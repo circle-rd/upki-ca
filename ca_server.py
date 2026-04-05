@@ -21,6 +21,7 @@ import os
 import secrets
 import signal
 import sys
+import time
 
 from upki_ca.ca.authority import Authority
 from upki_ca.connectors.zmq_listener import ZMQListener
@@ -249,6 +250,82 @@ class CAServer(Common):
             self._logger.error("CA Server", e)
             return False
 
+    def start(
+        self,
+        env_seed: str | None = None,
+        env_host: str = "0.0.0.0",
+    ) -> bool:
+        """Auto-bootstrap the CA and run both listeners concurrently.
+
+        On first boot (no config file yet), injects env_seed into the config
+        so it is used as the registration seed instead of generating a random
+        one, then calls init_pki() to create the CA key and certificate.
+
+        On subsequent boots (config and CA key/cert already exist on the data
+        volume), init_pki() is idempotent and skips key/cert generation.
+
+        Regardless of boot type, both the registration listener (port + 1)
+        and the CA listener (port) are started and the process is kept alive.
+
+        Args:
+            env_seed: Registration seed from the UPKI_CA_SEED environment
+                variable. Ignored when the config already contains a seed.
+            env_host: Bind address for both ZMQ sockets. Defaults to
+                ``0.0.0.0`` so Docker containers can accept connections
+                from other containers.
+
+        Returns:
+            bool: Always False on error; does not return normally on success
+                (blocks in an infinite sleep loop).
+        """
+        try:
+            # Pre-load config; inject env seed before any init so that
+            # init_pki() will not generate a new random seed.
+            self._config = Config(self._config_path())
+            self._config.load()
+            if env_seed and not self._config.get_seed():
+                self._config.set_seed(env_seed)
+
+            # Idempotent: generates CA key/cert only on first boot.
+            if not self.init_pki():
+                return False
+
+            port = self._config.get_port()
+            seed = self._config.get_seed() or "default_seed"
+            # Use env_host for binding so Docker containers can accept
+            # connections from other containers (0.0.0.0 vs 127.0.0.1).
+            host = env_host if env_host else self._config.get_host()
+
+            # init_pki() leaves self._authority initialised with its storage.
+            storage = self._authority.storage
+
+            # -- Registration listener (port + 1) ----------------------------
+            self._register_listener = ZMQRegister(
+                host=host,
+                port=port + 1,
+                seed=seed,
+                authority=self._authority,
+            )
+            self._register_listener.initialize()
+            self._register_listener.bind()
+            self._register_listener.start()
+            self._logger.info(f"Registration listener started on {host}:{port + 1}")
+
+            # -- CA listener (port) -------------------------------------------
+            self._listener = ZMQListener(host=host, port=port, storage=storage)
+            self._listener.initialize()
+            self._listener.initialize_authority()
+            self._listener.bind()
+            self._listener.start()
+            self._logger.info(f"CA server started on {host}:{port}")
+
+            while True:
+                time.sleep(1)
+
+        except Exception as e:
+            self._logger.error("CA Server", e)
+            return False
+
     def stop(self) -> bool:
         """
         Stop the CA Server.
@@ -321,6 +398,12 @@ def main() -> int:
     # register command
     subparsers.add_parser("register", help="Register RA (clear mode)")
 
+    # start command (default Docker entrypoint: auto-init + run both listeners)
+    subparsers.add_parser(
+        "start",
+        help="Auto-bootstrap: init if needed, then run register + CA listeners",
+    )
+
     # listen command
     listen_parser = subparsers.add_parser("listen", help="Start CA server (TLS mode)")
     listen_parser.add_argument("--host", default="127.0.0.1", help="Host to bind to")
@@ -333,7 +416,13 @@ def main() -> int:
 
     # Create server
     server = CAServer()
-    server._storage_path = args.path
+
+    # CLI --path takes precedence; fall back to env var when not set.
+    env_data_dir = os.environ.get("UPKI_DATA_DIR")
+    server._storage_path = args.path or env_data_dir or None
+
+    env_seed = os.environ.get("UPKI_CA_SEED")
+    env_host = os.environ.get("UPKI_CA_HOST", "0.0.0.0")
 
     # Execute command
     if args.command == "init":
@@ -389,6 +478,13 @@ def main() -> int:
 
     elif args.command == "listen":
         if server.listen():
+            return 0
+        else:
+            print("CA server failed to start", file=sys.stderr)
+            return 1
+
+    elif args.command == "start":
+        if server.start(env_seed=env_seed, env_host=env_host):
             return 0
         else:
             print("CA server failed to start", file=sys.stderr)

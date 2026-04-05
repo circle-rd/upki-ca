@@ -1522,6 +1522,189 @@ class TestSubCAChain:
         ), f"Full chain (Root → Sub-CA → Leaf) validation failed:\n{r.stderr}"
 
 
+class TestStartCommand:
+    """Functional tests for the ca_server.py start command.
+
+    Verifies the auto-bootstrap behaviour introduced for Docker deployment:
+    - Both ZMQ ports (listener + registration) become reachable.
+    - The command is idempotent across restarts.
+    - The UPKI_CA_SEED environment variable is persisted to ca.config.yml.
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Create and clean up a temporary PKI data directory."""
+        self.pki_path = "/tmp/test_pki_start"
+        self.ca_port = 15000
+        self.reg_port = 15001
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+
+        yield
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+
+    def _wait_for_port(self, host: str, port: int, timeout: float = 30.0) -> bool:
+        """Poll a TCP port until it is reachable or the timeout expires.
+
+        Args:
+            host: Target hostname or IP address.
+            port: Target TCP port number.
+            timeout: Maximum seconds to wait.
+
+        Returns:
+            bool: True if the port became reachable, False on timeout.
+        """
+        import socket
+        import time
+
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            try:
+                with socket.create_connection((host, port), timeout=1):
+                    return True
+            except OSError:
+                time.sleep(0.5)
+        return False
+
+    def test_start_bootstraps_ca_and_opens_both_ports(self):
+        """Test that start opens port 15000 (CA) and port 15001 (registration).
+
+        Launches ca_server.py start as a subprocess, waits for both ZMQ TCP
+        sockets to become reachable, then terminates the process.
+        """
+        import yaml
+
+        env = os.environ.copy()
+        env["UPKI_CA_SEED"] = "functional-test-seed"
+        env["UPKI_CA_HOST"] = "127.0.0.1"
+
+        # Use non-default ports to avoid conflicts with a running CA instance.
+        os.makedirs(self.pki_path, exist_ok=True)
+        config_path = os.path.join(self.pki_path, "ca.config.yml")
+        with open(config_path, "w") as f:
+            yaml.safe_dump({"host": "127.0.0.1", "port": self.ca_port}, f)
+
+        proc = subprocess.Popen(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "start"],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        try:
+            ca_ready = self._wait_for_port("127.0.0.1", self.ca_port)
+            reg_ready = self._wait_for_port("127.0.0.1", self.reg_port)
+
+            assert (
+                ca_ready
+            ), f"CA listener on port {self.ca_port} never became reachable"
+            assert (
+                reg_ready
+            ), f"Registration listener on port {self.reg_port} never became reachable"
+        finally:
+            proc.terminate()
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
+
+    def test_start_is_idempotent_on_restart(self):
+        """Test that re-running start on an existing PKI does not fail.
+
+        First init, then start on the same path; the seed in ca.config.yml
+        must remain unchanged after the second run.
+        """
+        import yaml
+
+        seed = "idempotency-test-seed"
+
+        # First pass: initialise PKI
+        result = subprocess.run(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "init"],
+            capture_output=True,
+            text=True,
+            env={**os.environ, "UPKI_CA_SEED": seed},
+        )
+        assert result.returncode == 0, result.stderr
+
+        # Read the seed that was stored
+        config_path = os.path.join(self.pki_path, "ca.config.yml")
+        with open(config_path) as f:
+            stored_seed = yaml.safe_load(f).get("seed")
+
+        # Second pass: start (init is idempotent inside start)
+        env = os.environ.copy()
+        env["UPKI_CA_SEED"] = "different-seed-must-be-ignored"
+        env["UPKI_CA_HOST"] = "127.0.0.1"
+
+        # Overwrite config with custom port to avoid conflicts
+        with open(config_path, "w") as f:
+            yaml.safe_dump({"host": "127.0.0.1", "port": self.ca_port, "seed": stored_seed}, f)
+
+        proc = subprocess.Popen(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "start"],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+        reachable = self._wait_for_port("127.0.0.1", self.ca_port)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+        assert reachable, "CA did not start on second run"
+
+        # Seed on disk must not have changed
+        with open(config_path) as f:
+            after_seed = yaml.safe_load(f).get("seed")
+        assert after_seed == stored_seed
+
+    def test_start_uses_provided_env_seed(self):
+        """Test that UPKI_CA_SEED is written to ca.config.yml on first boot."""
+        import yaml
+
+        expected_seed = "deterministic-seed-for-test"
+        env = os.environ.copy()
+        env["UPKI_CA_SEED"] = expected_seed
+        env["UPKI_CA_HOST"] = "127.0.0.1"
+
+        os.makedirs(self.pki_path, exist_ok=True)
+        config_path = os.path.join(self.pki_path, "ca.config.yml")
+        with open(config_path, "w") as f:
+            yaml.safe_dump({"host": "127.0.0.1", "port": self.ca_port}, f)
+
+        proc = subprocess.Popen(
+            [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "start"],
+            env=env,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+        )
+
+        reachable = self._wait_for_port("127.0.0.1", self.ca_port)
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
+
+        assert reachable, "CA did not start within timeout"
+
+        config_path = os.path.join(self.pki_path, "ca.config.yml")
+        assert os.path.exists(config_path), "ca.config.yml was not created"
+
+        with open(config_path) as f:
+            written_seed = yaml.safe_load(f).get("seed")
+        assert written_seed == expected_seed
+
+
 # Run tests if executed directly
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
