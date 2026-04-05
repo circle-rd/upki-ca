@@ -39,11 +39,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install poetry
-          poetry install --no-root --with dev
-
-      - name: Run linter
-        run: |
-          poetry run ruff check .
+          poetry install --with dev
 
       - name: Run tests
         run: |
@@ -55,3 +51,26 @@ jobs:
           file: ./coverage.xml
           flags: unittests
           name: codecov-umbrella
+
+  lint:
+    name: Lint code
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install poetry
+          poetry install --with lint
+
+      - name: Run Ruff linter
+        run: |
+          poetry run ruff check .
