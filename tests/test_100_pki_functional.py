@@ -1606,7 +1606,11 @@ class TestStartCommand:
             ), f"Registration listener on port {self.reg_port} never became reachable"
         finally:
             proc.terminate()
-            proc.wait(timeout=5)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait()
 
     def test_start_is_idempotent_on_restart(self):
         """Test that re-running start on an existing PKI does not fail.
@@ -1637,15 +1641,23 @@ class TestStartCommand:
         env["UPKI_CA_SEED"] = "different-seed-must-be-ignored"
         env["UPKI_CA_HOST"] = "127.0.0.1"
 
+        # Overwrite config with custom port to avoid conflicts
+        with open(config_path, "w") as f:
+            yaml.safe_dump({"host": "127.0.0.1", "port": self.ca_port, "seed": stored_seed}, f)
+
         proc = subprocess.Popen(
             [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "start"],
             env=env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )
-        reachable = self._wait_for_port("127.0.0.1", 5000)
+        reachable = self._wait_for_port("127.0.0.1", self.ca_port)
         proc.terminate()
-        proc.wait(timeout=5)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
 
         assert reachable, "CA did not start on second run"
 
@@ -1663,6 +1675,11 @@ class TestStartCommand:
         env["UPKI_CA_SEED"] = expected_seed
         env["UPKI_CA_HOST"] = "127.0.0.1"
 
+        os.makedirs(self.pki_path, exist_ok=True)
+        config_path = os.path.join(self.pki_path, "ca.config.yml")
+        with open(config_path, "w") as f:
+            yaml.safe_dump({"host": "127.0.0.1", "port": self.ca_port}, f)
+
         proc = subprocess.Popen(
             [sys.executable, CA_SERVER_PATH, "--path", self.pki_path, "start"],
             env=env,
@@ -1670,9 +1687,13 @@ class TestStartCommand:
             stderr=subprocess.PIPE,
         )
 
-        reachable = self._wait_for_port("127.0.0.1", 5000)
+        reachable = self._wait_for_port("127.0.0.1", self.ca_port)
         proc.terminate()
-        proc.wait(timeout=5)
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            proc.wait()
 
         assert reachable, "CA did not start within timeout"
 
