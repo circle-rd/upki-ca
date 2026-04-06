@@ -87,6 +87,7 @@ class ZMQRegister(Listener):
         seed = params.get("seed", "")
         cn = params.get("cn", "")
         profile = params.get("profile", "ra")
+        sans: list[dict[str, str]] | None = params.get("sans")
 
         # Validate seed
         if seed != self._seed:
@@ -106,7 +107,7 @@ class ZMQRegister(Listener):
 
         if self._authority is not None:
             try:
-                cert = self._authority.generate_certificate(cn, profile)
+                cert = self._authority.generate_certificate(cn, profile, sans=sans)
 
                 # Retrieve the private key that generate_certificate stored
                 key_bytes = (
