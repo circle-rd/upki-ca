@@ -254,6 +254,8 @@ class CAServer(Common):
         self,
         env_seed: str | None = None,
         env_host: str = "0.0.0.0",
+        env_ca_key_file: str | None = None,
+        env_ca_cert_file: str | None = None,
     ) -> bool:
         """Auto-bootstrap the CA and run both listeners concurrently.
 
@@ -273,6 +275,12 @@ class CAServer(Common):
             env_host: Bind address for both ZMQ sockets. Defaults to
                 ``0.0.0.0`` so Docker containers can accept connections
                 from other containers.
+            env_ca_key_file: Path to an existing CA private key PEM file
+                (from UPKI_CA_KEY_FILE). Passed to init_pki() only on first
+                boot when the CA has not been initialised yet.
+            env_ca_cert_file: Path to an existing CA certificate PEM file
+                (from UPKI_CA_CERT_FILE). Passed to init_pki() only on first
+                boot when the CA has not been initialised yet.
 
         Returns:
             bool: Always False on error; does not return normally on success
@@ -287,7 +295,13 @@ class CAServer(Common):
                 self._config.set_seed(env_seed)
 
             # Idempotent: generates CA key/cert only on first boot.
-            if not self.init_pki():
+            # When UPKI_CA_KEY_FILE / UPKI_CA_CERT_FILE are provided and the
+            # CA is not yet initialised, import the supplied key/cert pair
+            # instead of generating a fresh one.
+            if not self.init_pki(
+                ca_key_path=env_ca_key_file,
+                ca_cert_path=env_ca_cert_file,
+            ):
                 return False
 
             port = self._config.get_port()
@@ -423,6 +437,8 @@ def main() -> int:
 
     env_seed = os.environ.get("UPKI_CA_SEED")
     env_host = os.environ.get("UPKI_CA_HOST", "0.0.0.0")
+    env_ca_key_file = os.environ.get("UPKI_CA_KEY_FILE")
+    env_ca_cert_file = os.environ.get("UPKI_CA_CERT_FILE")
 
     # Execute command
     if args.command == "init":
@@ -484,7 +500,12 @@ def main() -> int:
             return 1
 
     elif args.command == "start":
-        if server.start(env_seed=env_seed, env_host=env_host):
+        if server.start(
+            env_seed=env_seed,
+            env_host=env_host,
+            env_ca_key_file=env_ca_key_file,
+            env_ca_cert_file=env_ca_cert_file,
+        ):
             return 0
         else:
             print("CA server failed to start", file=sys.stderr)
