@@ -152,41 +152,41 @@ On first run, `ca_server.py init` creates `ca.config.yml` in the storage directo
 company: "Company Name"
 domain: "example.com"
 host: "127.0.0.1"
-port: 5000          # CA listener; registration listener uses port + 1
+port: 5000 # CA listener; registration listener uses port + 1
 clients: "register" # all | register | manual
-password: null      # CA private key password (null = no encryption)
-seed: null          # RA registration seed (auto-generated if absent)
-key_type: "rsa"     # rsa | dsa
+password: null # CA private key password (null = no encryption)
+seed: null # RA registration seed (auto-generated if absent)
+key_type: "rsa" # rsa | dsa
 key_length: 4096
-digest: "sha256"    # md5 | sha1 | sha256 | sha512
-crl_validity: 7     # CRL validity in days
+digest: "sha256" # md5 | sha1 | sha256 | sha512
+crl_validity: 7 # CRL validity in days
 ```
 
 ### Environment Variables
 
 When running via Docker or systemd, configuration can be injected without editing the config file:
 
-| Variable            | Description                                          |
-| ------------------- | ---------------------------------------------------- |
-| `UPKI_DATA_DIR`     | Override the storage path (`--path` equivalent)      |
-| `UPKI_CA_SEED`      | Registration seed (used by `start` on first boot)    |
+| Variable            | Description                                           |
+| ------------------- | ----------------------------------------------------- |
+| `UPKI_DATA_DIR`     | Override the storage path (`--path` equivalent)       |
+| `UPKI_CA_SEED`      | Registration seed (used by `start` on first boot)     |
 | `UPKI_CA_HOST`      | Bind address for both ZMQ sockets (default `0.0.0.0`) |
-| `UPKI_CA_KEY_FILE`  | Path to an existing CA private key to import         |
-| `UPKI_CA_CERT_FILE` | Path to an existing CA certificate to import         |
+| `UPKI_CA_KEY_FILE`  | Path to an existing CA private key to import          |
+| `UPKI_CA_CERT_FILE` | Path to an existing CA certificate to import          |
 
 ## Certificate Profiles
 
 Profiles are stored as YAML files under `~/.upki/ca/profiles/`. The following built-in profiles are created automatically at initialisation:
 
-| Profile  | Type     | Default Validity | Key Usage                                    |
-| -------- | -------- | ---------------- | -------------------------------------------- |
-| `ca`     | `sslCA`  | 10 years         | `keyCertSign`, `cRLSign`                     |
-| `ra`     | `sslCA`  | 1 year           | `digitalSignature`, `keyEncipherment`        |
-| `server` | `server` | 60 days          | `serverAuth`                                 |
-| `webapp` | `server` | 60 days          | `serverAuth`, `clientAuth`                   |
-| `laptop` | `user`   | 30 days          | `clientAuth`, `emailProtection`              |
-| `user`   | `user`   | 30 days          | `clientAuth`                                 |
-| `admin`  | `user`   | 1 year           | `clientAuth`                                 |
+| Profile  | Type     | Default Validity | Key Usage                             |
+| -------- | -------- | ---------------- | ------------------------------------- |
+| `ca`     | `sslCA`  | 10 years         | `keyCertSign`, `cRLSign`              |
+| `ra`     | `sslCA`  | 1 year           | `digitalSignature`, `keyEncipherment` |
+| `server` | `server` | 60 days          | `serverAuth`                          |
+| `webapp` | `server` | 60 days          | `serverAuth`, `clientAuth`            |
+| `laptop` | `user`   | 30 days          | `clientAuth`, `emailProtection`       |
+| `user`   | `user`   | 30 days          | `clientAuth`                          |
+| `admin`  | `user`   | 1 year           | `clientAuth`                          |
 
 Custom profiles can be added by dropping a YAML file in the `profiles/` directory.
 
@@ -277,19 +277,19 @@ upki-ca/
 
 The CA exposes the following commands on port 5000. See [docs/CA_ZMQ_PROTOCOL.md](docs/CA_ZMQ_PROTOCOL.md) for the full message format.
 
-| Command        | Description                             |
-| -------------- | --------------------------------------- |
-| `get_ca`       | Retrieve the CA certificate             |
-| `get_crl`      | Retrieve the current CRL                |
-| `generate_crl` | Force CRL regeneration                  |
-| `generate`     | Generate a key pair and sign a cert     |
-| `sign`         | Sign an external CSR                    |
-| `renew`        | Renew an existing certificate           |
-| `revoke`       | Revoke a certificate                    |
-| `unrevoke`     | Remove a certificate from the CRL       |
-| `delete`       | Delete a certificate record             |
-| `view`         | Retrieve certificate details            |
-| `ocsp_check`   | Check the revocation status of a cert   |
+| Command        | Description                           |
+| -------------- | ------------------------------------- |
+| `get_ca`       | Retrieve the CA certificate           |
+| `get_crl`      | Retrieve the current CRL              |
+| `generate_crl` | Force CRL regeneration                |
+| `generate`     | Generate a key pair and sign a cert   |
+| `sign`         | Sign an external CSR                  |
+| `renew`        | Renew an existing certificate         |
+| `revoke`       | Revoke a certificate                  |
+| `unrevoke`     | Remove a certificate from the CRL     |
+| `delete`       | Delete a certificate record           |
+| `view`         | Retrieve certificate details          |
+| `ocsp_check`   | Check the revocation status of a cert |
 
 ## Development
 
