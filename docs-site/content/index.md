@@ -1,122 +1,76 @@
 ---
 title: uPKI CA
 navigation: false
-layout: page
 ---
 
-## ::hero
+# Your internal PKI, zero internet required.
 
-announcement:
-title: 'ACME v2 support'
-icon: '🔐'
-to: /docs/guides/certificate-profiles
-actions:
-
-- name: Get Started
-  to: /docs/getting-started/introduction
-- name: GitHub
-  variant: ghost
-  to: https://github.com/circle-rd/upki-ca
-  leftIcon: 'lucide:github'
-
----
-
-#title
-Your internal PKI,\nzero internet required.
-
-#description
 uPKI CA is a self-hosted Certificate Authority that gives you **complete control** over your internal TLS infrastructure. Issue, renew, and revoke X.509 certificates via ZMQ — no cloud, no third party, no dependency.
-::
 
-::card-grid
-#title
-Why uPKI CA?
+[Get Started](/docs/getting-started/introduction) · [GitHub](https://github.com/circle-rd/upki-ca)
 
-#root
-:ellipsis
+## Why uPKI CA?
 
-#default
-::card
+:::card-group
 
----
+## ::card
 
-icon: lucide:shield
+title: Air-gapped by design
+icon: i-lucide-shield
 
 ---
 
-#title
-Air-gapped by design
-#description
 Runs fully offline. No internet access required — ideal for secure, regulated, or isolated environments.
 ::
 
-::card
+## ::card
+
+title: ZMQ protocol
+icon: i-lucide-zap
 
 ---
 
-icon: lucide:zap
-
----
-
-#title
-ZMQ protocol
-#description
 Fast, binary-safe JSON-over-ZMQ protocol. One port for CA operations, one for RA registration.
 ::
 
-::card
+## ::card
+
+title: 7 built-in profiles
+icon: i-lucide-layers
 
 ---
 
-icon: lucide:layers
-
----
-
-#title
-7 built-in profiles
-#description
 Ready-made profiles for root CA, intermediate CA, server, client, OCSP, email, and code signing.
 ::
 
-::card
+## ::card
+
+title: Flexible storage
+icon: i-lucide-database
 
 ---
 
-icon: lucide:database
-
----
-
-#title
-Flexible storage
-#description
 File-based by default (TinyDB + filesystem). MongoDB adapter available for larger deployments.
 ::
 
-::card
+## ::card
+
+title: Full lifecycle
+icon: i-lucide-refresh-cw
 
 ---
 
-icon: lucide:refresh-cw
-
----
-
-#title
-Full lifecycle
-#description
 Generate, sign, renew, revoke, unrevoke, and delete certificates with a clean ZMQ API.
 ::
 
-::card
+## ::card
+
+title: uPKI ecosystem
+icon: i-lucide-puzzle
 
 ---
 
-icon: lucide:puzzle
-
----
-
-#title
-uPKI ecosystem
-#description
 Works seamlessly with uPKI RA (ACME v2) and uPKI CLI for a complete private PKI stack.
 ::
-::
+
+:::

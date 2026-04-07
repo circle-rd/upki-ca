@@ -8,10 +8,9 @@
         "generate": "nuxt generate",
         "preview": "nuxt preview"
     },
-    "devDependencies": {
-        "nuxt": "^3.13.0"
-    },
     "dependencies": {
-        "@nuxt-themes/docus": "^1.15.0"
+        "docus": "latest",
+        "nuxt": "^4.0.0",
+        "better-sqlite3": "^12.2.0"
     }
 }
