@@ -14,6 +14,7 @@ permissions:
 
 jobs:
   test:
+    name: Run tests
     runs-on: ubuntu-latest
 
     steps:
@@ -40,6 +41,7 @@ jobs:
           poetry run pytest
 
   docker:
+    name: Build and push Docker image
     needs: test
     runs-on: ubuntu-latest
 
