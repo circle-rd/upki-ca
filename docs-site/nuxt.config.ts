@@ -1,0 +1,2 @@
+extends:
+  - '@nuxt-themes/docus'
