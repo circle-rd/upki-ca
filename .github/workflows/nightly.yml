@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   docker:
+    name: Build and push Docker image
     runs-on: ubuntu-latest
 
     steps:

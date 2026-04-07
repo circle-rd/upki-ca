@@ -1,2 +1,3 @@
-extends:
-  - '@nuxt-themes/docus'
+export default defineNuxtConfig({
+  extends: ["@nuxt-themes/docus"],
+});

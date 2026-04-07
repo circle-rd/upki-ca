@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   test:
+    name: Run unit tests (Python ${{ matrix.python-version }})
     runs-on: ubuntu-latest
 
     strategy:
