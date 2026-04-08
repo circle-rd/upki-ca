@@ -1,5 +1,4 @@
 ---
-navigation: false
 seo:
   title: uPKI CA — Self-hosted Certificate Authority
   description: Self-hosted Certificate Authority — private PKI with zero internet dependency.
