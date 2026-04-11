@@ -1,9 +1,8 @@
 <script setup lang="ts">
-import type { Collections } from '@nuxt/content'
 
 // Hardcode path to '/' so it is never affected by NUXT_APP_BASE_URL at runtime.
 const { data: page } = await useAsyncData('landing', () =>
-  queryCollection('landing' as keyof Collections).path('/').first(),
+  queryCollection('landing').path('/').first(),
 )
 
 if (!page.value) {
