@@ -1,8 +1,10 @@
 <script setup lang="ts">
 
-// Hardcode path to '/' so it is never affected by NUXT_APP_BASE_URL at runtime.
+// The landing collection always contains exactly one document (content/index.md).
+// Using .first() avoids any stored-path edge cases ('/index', '', etc.) that
+// could cause .path('/').first() to return null and throw a 404.
 const { data: page } = await useAsyncData('landing', () =>
-  queryCollection('landing').path('/').first(),
+  queryCollection('landing').first(),
 )
 
 if (!page.value) {
