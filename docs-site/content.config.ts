@@ -1,6 +1,5 @@
 import { defineContentConfig, defineCollection } from '@nuxt/content'
-import { useNuxt } from '@nuxt/kit'
-import { joinURL } from 'ufo'
+import { resolve } from 'path'
 
 /**
  * Local content configuration for uPKI-CA docs.
@@ -8,21 +7,26 @@ import { joinURL } from 'ufo'
  * We only declare the `landing` collection here (content/index.md).
  * The `docs` collection (content/docs/**) is handled by the Docus layer.
  *
- * We use an explicit `cwd` (mirroring the Docus layer pattern) to ensure
- * @nuxt/content resolves `index.md` from THIS project's content/ directory
- * rather than leaving it ambiguous in the layer stack. Without it, since
- * Docus PR #1274 no longer defines the landing collection when index.vue
- * exists, the collection ends up empty and the landing page returns 404.
+ * After Docus PR #1274 (Feb 16 2026), the Docus layer no longer defines the
+ * `landing` collection when app/pages/index.vue exists in the user project.
+ * We must define it here with an explicit `cwd` so that @nuxt/content resolves
+ * index.md from THIS project's content/ directory.
+ *
+ * We use `resolve(process.cwd(), 'content')` rather than useNuxt() because
+ * this file is evaluated by c12/jiti in the same Node.js process as `nuxt build`,
+ * making process.cwd() a guaranteed, zero-import way to get the project root.
+ * Importing @nuxt/kit inside jiti can fail silently (c12 catches evaluation
+ * errors and falls back to defaultConfig: { collections: {} }), which would
+ * leave the landing collection empty and cause a 404 on the landing page.
  */
-const { options } = useNuxt()
-const cwd = joinURL(options.rootDir, 'content')
+const contentDir = resolve(process.cwd(), 'content')
 
 export default defineContentConfig({
   collections: {
     landing: defineCollection({
       type: 'page',
       source: {
-        cwd,
+        cwd: contentDir,
         include: 'index.md',
       },
     }),
