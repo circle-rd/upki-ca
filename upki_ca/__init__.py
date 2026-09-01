@@ -13,10 +13,10 @@ Main Components:
 - Profiles: Certificate profile management
 - ZMQ connectors: CA-RA communication
 
-Version: 0.1.0
+Version: 0.1.5
 """
 
-__version__ = "0.1.0"
+__version__ = "0.1.5"
 __author__ = "uPKI Team"
 __license__ = "MIT"
 

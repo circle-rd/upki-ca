@@ -9,25 +9,25 @@ license = {text = "MIT"}
 readme = "README.md"
 requires-python = ">=3.11, <4.0"
 dependencies = [
-    "cryptography (>=46.0.5,<47.0.0)",
+    "cryptography (>=50.0.1,<51.0.0)",
     "pyyaml (>=6.0.3,<7.0.0)",
-    "tinydb (>=4.8.2,<5.0.0)",
-    "pyzmq (>=26.0.0,<27.0.0)"
+    "tinydb (>=4.9.0,<5.0.0)",
+    "pyzmq (>=27.0.0,<28.0.0)"
 ]
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-ruff = ">=0.10.0,<1.0.0"
+ruff = ">=0.16.0,<1.0.0"
 
 [tool.poetry.group.dev]
 optional = true
 
 [tool.poetry.group.dev.dependencies]
-pytest = ">=8.0.0,<9.0.0"
-pytest-cov = ">=6.0.0,<7.0.0"
-pytest-asyncio = ">=0.25.0,<1.0.0"
+pytest = ">=9.0.0,<10.0.0"
+pytest-cov = ">=7.0.0,<8.0.0"
+pytest-asyncio = ">=1.0.0,<2.0.0"
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

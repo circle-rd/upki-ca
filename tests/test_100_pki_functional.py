@@ -14,6 +14,7 @@ License: MIT
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -195,8 +196,8 @@ class TestCertificateGeneration:
             check=True,
         )
         assert "Certificate:" in result.stdout
-        # Note: openssl outputs "CN = Test Entity" with spaces
-        assert "CN =" in result.stdout and "Test Entity" in result.stdout
+        # openssl subject format varies by version ("CN = X" vs "CN=X")
+        assert re.search(r"CN\s*=\s*Test Entity", result.stdout)
 
         # Verify certificate dates
         result = subprocess.run(
@@ -297,14 +298,14 @@ class TestCertificateValidation:
         assert "Version:" in result.stdout
         assert "Serial Number:" in result.stdout
 
-        # Verify certificate subject - openssl outputs with spaces
+        # Verify certificate subject - openssl subject format varies by version
         result = subprocess.run(
             ["openssl", "x509", "-in", entity_cert, "-noout", "-subject"],
             capture_output=True,
             text=True,
             check=True,
         )
-        assert "CN =" in result.stdout and "Test Entity" in result.stdout
+        assert re.search(r"CN\s*=\s*Test Entity", result.stdout)
 
     def test_certificate_chain_verification(self):
         """
@@ -529,14 +530,14 @@ class TestCertificateRevocation:
         )
         assert "OK" in result.stdout
 
-        # Verify the certificate structure
+        # Verify the certificate structure - openssl subject format varies by version
         result = subprocess.run(
             ["openssl", "x509", "-in", test_cert, "-noout", "-subject"],
             capture_output=True,
             text=True,
             check=True,
         )
-        assert "CN =" in result.stdout and "Revoke Test" in result.stdout
+        assert re.search(r"CN\s*=\s*Revoke Test", result.stdout)
 
 
 # Run tests if executed directly
