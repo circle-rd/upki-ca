@@ -270,13 +270,16 @@ class PublicCert(Common):
         # For self-signed, the issuer is the subject itself
         # (no need to store the public key separately)
 
-        # Get subject from CSR for DN validation
-        subject_dict = {}
-        for attr in subject:
-            subject_dict[attr.oid._name] = attr.value
-
-        if "CN" in subject_dict:
-            DNValidator.validate_cn(subject_dict["CN"])
+        # Validate the CN, if present. Real bug fixed here: this used to
+        # build a dict keyed by `attr.oid._name` (cryptography's *long*
+        # attribute name, e.g. "commonName") then check for a "CN" key
+        # that never existed, so `DNValidator.validate_cn()` was never
+        # actually invoked for any issued certificate - found via a live
+        # Phase 3 frontend smoke test that traced a related renewal bug
+        # back to this same `._name`-vs-"CN" mistake.
+        cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        if cn_attrs:
+            DNValidator.validate_cn(str(cn_attrs[0].value))
 
         # Build certificate builder
         builder = (

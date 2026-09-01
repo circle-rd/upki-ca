@@ -109,6 +109,7 @@ class ZMQListener(Listener):
             "unrevoke": self._upki_unrevoke,
             "delete": self._upki_delete,
             "view": self._upki_view,
+            "list_nodes": self._upki_list_nodes,
             "ocsp_check": self._upki_ocsp_check,
             "list_profiles": self._upki_list_profiles,
             "get_profile": self._upki_get_profile,
@@ -358,6 +359,15 @@ class ZMQListener(Listener):
             raise AuthorityError("Authority not initialized")
 
         return self._authority.view_certificate(dn)
+
+    # Node Listing
+
+    def _upki_list_nodes(self, params: dict[str, Any]) -> list[dict[str, Any]]:
+        """List all certificates known to the CA."""
+        if not self._authority:
+            raise AuthorityError("Authority not initialized")
+
+        return self._authority.list_nodes()
 
     # OCSP Check
 

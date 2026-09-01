@@ -587,8 +587,13 @@ class Authority(Common):
         if self._storage is None:
             raise AuthorityError("Storage not initialized")
 
+        # storage.get_cert() is keyed by bare CN (see store_cert calls below),
+        # while `dn` here is a full Distinguished Name (e.g. "/CN=x/O=y") for
+        # every real caller - extract the CN first or every revocation fails.
+        cn = self.parse_dn(dn).get("CN") or dn
+
         # Load certificate
-        cert_data = self._storage.get_cert(dn)
+        cert_data = self._storage.get_cert(cn)
         if not cert_data:
             raise CertificateError(f"Certificate not found: {dn}")
 
@@ -645,8 +650,10 @@ class Authority(Common):
         if self._storage is None:
             raise AuthorityError("Storage not initialized")
 
+        cn = self.parse_dn(dn).get("CN") or dn
+
         # Load certificate
-        cert_data = self._storage.get_cert(dn)
+        cert_data = self._storage.get_cert(cn)
         if not cert_data:
             raise CertificateError(f"Certificate not found: {dn}")
 
@@ -696,7 +703,7 @@ class Authority(Common):
             raise AuthorityError("CA not loaded")
 
         # Load old certificate
-        cert_data = self._storage.get_cert(dn)
+        cert_data = self._storage.get_cert(self.parse_dn(dn).get("CN") or dn)
         if not cert_data:
             raise CertificateError(f"Certificate not found: {dn}")
 
@@ -706,12 +713,14 @@ class Authority(Common):
         profile_name = "server"  # Default
         profile = self.get_profile(profile_name)
 
-        # Get subject info
-        subject_dict = {}
-        for attr in old_cert.subject:
-            subject_dict[attr.oid._name] = attr.value
-
-        cn = subject_dict.get("CN")
+        # Get the CN from the old certificate. Real bug fixed here: this
+        # used to build a dict keyed by `attr.oid._name` (cryptography's
+        # *long* attribute name, e.g. "commonName") then look up "CN" in
+        # it - a key that never existed, so renewal always raised "Old
+        # certificate has no Common Name" for every certificate, found via
+        # a live Phase 3 frontend smoke test. `PublicCert.subject_cn`
+        # already does this correctly via `get_attributes_for_oid`.
+        cn = old_cert.subject_cn
         if not cn:
             raise CertificateError("Old certificate has no Common Name")
 
@@ -772,7 +781,7 @@ class Authority(Common):
         if self._storage is None:
             raise AuthorityError("Storage not initialized")
 
-        cert_data = self._storage.get_cert(dn)
+        cert_data = self._storage.get_cert(self.parse_dn(dn).get("CN") or dn)
         if not cert_data:
             raise CertificateError(f"Certificate not found: {dn}")
 
@@ -798,6 +807,57 @@ class Authority(Common):
 
         return cert_info
 
+    def list_nodes(self) -> list[dict[str, Any]]:
+        """
+        List all certificates known to this CA, with their PEM data and
+        best-effort revocation status.
+
+        Unlike `storage.get_node`/`store_node` (only ever populated as a
+        side effect of `revoke_certificate`/`renew_certificate`/
+        `delete_certificate` bookkeeping), this enumerates
+        `storage.list_certs()` - written for every certificate issued via
+        `generate_certificate`/`sign_csr` - so it reflects the CA's full
+        certificate inventory, not just entries that were later revoked or
+        renewed.
+
+        Returns:
+            list: List of ``{"dn", "cn", "serial", "certificate", "revoked"}``
+            dicts, one per known certificate.
+        """
+        if self._storage is None:
+            raise AuthorityError("Storage not initialized")
+
+        results: list[dict[str, Any]] = []
+        for name in self._storage.list_certs():
+            if name == "ca":
+                # The CA's own self-signed identity is not an issued "node".
+                continue
+
+            cert_data = self._storage.get_cert(name)
+            if not cert_data:
+                continue
+            try:
+                cert = PublicCert.load(cert_data.decode("utf-8"))
+            except Exception:
+                continue
+
+            dn = f"/CN={name}"
+            node_data = self._storage.get_node(dn) or {}
+            revoked = bool(node_data.get("revoked", False))
+            if not revoked:
+                revoked = any(entry.get("dn") == dn for entry in self._crl)
+
+            results.append(
+                {
+                    "dn": dn,
+                    "cn": name,
+                    "serial": cert.serial_number,
+                    "certificate": cert_data.decode("utf-8"),
+                    "revoked": revoked,
+                }
+            )
+        return results
+
     def delete_certificate(self, dn: str) -> bool:
         """
         Delete a certificate.
@@ -813,8 +873,12 @@ class Authority(Common):
         if self._storage is None:
             raise AuthorityError("Storage not initialized")
 
+        # Extract CN from DN (also needed for the storage.get_cert() lookup
+        # below, since certs are stored by bare CN, not the full DN).
+        cn = self.parse_dn(dn).get("CN") or dn
+
         # Check if certificate exists
-        cert_data = self._storage.get_cert(dn)
+        cert_data = self._storage.get_cert(cn)
         if not cert_data:
             raise CertificateError(f"Certificate not found: {dn}")
 
@@ -822,9 +886,6 @@ class Authority(Common):
 
         # Revoke first for audit purposes
         self.revoke_certificate(dn, "cessationOfOperation")
-
-        # Extract CN from DN
-        cn = dn.split("CN=")[-1] if "CN=" in dn else dn
 
         # Delete private key if exists
         self._storage.delete_key(cn)
