@@ -98,19 +98,28 @@ class Common:
         """
         Parse a Distinguished Name into components.
 
+        Supports both the CA's native slash-separated format
+        (e.g. "/C=FR/O=Company/CN=example.com") and the comma-separated
+        RFC 4514 format produced by `cryptography`'s
+        `Name.rfc4514_string()` (e.g. "CN=example.com,O=Company"), which
+        RA callers pass through as-is - auto-detected by delimiter, slash
+        taking priority when both are present. Does not handle RFC 4514
+        backslash-escaped commas within a value.
+
         Args:
-            dn: Distinguished Name string (e.g., "/C=FR/O=Company/CN=example.com")
+            dn: Distinguished Name string, slash- or comma-separated.
 
         Returns:
             dict: Dictionary of DN components (C, ST, L, O, OU, CN, etc.)
         """
         result: dict[str, str] = {}
 
-        # Remove leading slash if present
-        dn = dn.lstrip("/")
+        separator = "/" if "/" in dn else ","
 
-        # Split by "/" and parse each component
-        parts = dn.split("/")
+        # Remove leading separator if present
+        dn = dn.lstrip(separator)
+
+        parts = dn.split(separator)
         for part in parts:
             if "=" in part:
                 key, value = part.split("=", 1)

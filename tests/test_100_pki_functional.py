@@ -14,6 +14,7 @@ License: MIT
 """
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -195,8 +196,8 @@ class TestCertificateGeneration:
             check=True,
         )
         assert "Certificate:" in result.stdout
-        # Note: openssl outputs "CN = Test Entity" with spaces
-        assert "CN =" in result.stdout and "Test Entity" in result.stdout
+        # openssl subject format varies by version ("CN = X" vs "CN=X")
+        assert re.search(r"CN\s*=\s*Test Entity", result.stdout)
 
         # Verify certificate dates
         result = subprocess.run(
@@ -297,14 +298,14 @@ class TestCertificateValidation:
         assert "Version:" in result.stdout
         assert "Serial Number:" in result.stdout
 
-        # Verify certificate subject - openssl outputs with spaces
+        # Verify certificate subject - openssl subject format varies by version
         result = subprocess.run(
             ["openssl", "x509", "-in", entity_cert, "-noout", "-subject"],
             capture_output=True,
             text=True,
             check=True,
         )
-        assert "CN =" in result.stdout and "Test Entity" in result.stdout
+        assert re.search(r"CN\s*=\s*Test Entity", result.stdout)
 
     def test_certificate_chain_verification(self):
         """
@@ -529,14 +530,14 @@ class TestCertificateRevocation:
         )
         assert "OK" in result.stdout
 
-        # Verify the certificate structure
+        # Verify the certificate structure - openssl subject format varies by version
         result = subprocess.run(
             ["openssl", "x509", "-in", test_cert, "-noout", "-subject"],
             capture_output=True,
             text=True,
             check=True,
         )
-        assert "CN =" in result.stdout and "Revoke Test" in result.stdout
+        assert re.search(r"CN\s*=\s*Revoke Test", result.stdout)
 
 
 # Run tests if executed directly
@@ -1703,6 +1704,197 @@ class TestStartCommand:
         with open(config_path) as f:
             written_seed = yaml.safe_load(f).get("seed")
         assert written_seed == expected_seed
+
+
+class TestListNodes:
+    """Tests for `Authority.list_nodes()` (backs the CA's `list_nodes` ZMQ task)."""
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Set up and tear down for each test."""
+        self.pki_path = "/tmp/test_pki_list_nodes"
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+        yield
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+        Authority.reset_instance()
+
+    def _authority(self):
+        from upki_ca.ca.authority import Authority
+        from upki_ca.storage.file_storage import FileStorage
+
+        storage = FileStorage(self.pki_path)
+        storage.initialize()
+        authority = Authority.get_instance()
+        authority.initialize(storage=storage, keychain=self.pki_path)
+        return authority
+
+    def test_list_nodes_empty_when_nothing_issued(self):
+        authority = self._authority()
+        assert authority.list_nodes() == []
+
+    def test_list_nodes_includes_certificates_issued_via_generate_certificate(self):
+        """Certificates issued via generate_certificate must be listed even if
+        never revoked/renewed (they never touch node storage otherwise)."""
+        authority = self._authority()
+        cert = authority.generate_certificate("node1.example.com", "server")
+
+        nodes = authority.list_nodes()
+        assert len(nodes) == 1
+        assert nodes[0]["cn"] == "node1.example.com"
+        assert nodes[0]["dn"] == "/CN=node1.example.com"
+        assert nodes[0]["serial"] == cert.serial_number
+        assert "BEGIN CERTIFICATE" in nodes[0]["certificate"]
+        assert nodes[0]["revoked"] is False
+
+    def test_list_nodes_includes_certificates_issued_via_sign_csr(self):
+        authority = self._authority()
+
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (
+            x509.CertificateSigningRequestBuilder()
+            .subject_name(
+                x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "csr-node.example.com")])
+            )
+            .sign(private_key, hashes.SHA256())
+        )
+        csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+
+        authority.sign_csr(csr_pem, "server")
+
+        nodes = authority.list_nodes()
+        assert len(nodes) == 1
+        assert nodes[0]["cn"] == "csr-node.example.com"
+
+    def test_list_nodes_reflects_revoked_status(self):
+        authority = self._authority()
+        authority.generate_certificate("revoke-me.example.com", "server")
+
+        authority.revoke_certificate("/CN=revoke-me.example.com", "keyCompromise")
+
+        nodes = authority.list_nodes()
+        assert len(nodes) == 1
+        assert nodes[0]["revoked"] is True
+
+    def test_list_nodes_multiple_certificates(self):
+        authority = self._authority()
+        authority.generate_certificate("node1.example.com", "server")
+        authority.generate_certificate("node2.example.com", "server")
+
+        nodes = authority.list_nodes()
+        assert {n["cn"] for n in nodes} == {"node1.example.com", "node2.example.com"}
+
+
+class TestRenewCertificateRFC4514DN:
+    """Tests for `Authority.renew_certificate()` with a comma-separated,
+    multi-attribute RFC 4514 DN (e.g. "CN=x,O=y", as produced by
+    `cryptography`'s `Name.rfc4514_string()` and passed through as-is by the
+    RA's `/api/v1/inventory/certificates/{serial}/renew` endpoint - see
+    `upki_ra/utils/cert_metadata.py`).
+
+    Regression coverage for two real bugs found via a live Phase 3 frontend
+    smoke test (renew always failed for any real certificate):
+    1. `Common.parse_dn()` only understood the CA's native slash-separated
+       format (`/CN=x/O=y`); a comma-separated multi-attribute DN with no
+       slash at all was parsed into a single garbage key/value pair with no
+       "CN" key, so the pre-renewal `storage.get_cert()` lookup always
+       raised "Certificate not found".
+    2. Even past that, `renew_certificate()` extracted the *old*
+       certificate's own CN via a dict keyed by `attr.oid._name`
+       (cryptography's *long* name, e.g. "commonName") then looked up the
+       short form "CN" in it - a key that never existed, so it always
+       raised "Old certificate has no Common Name".
+    """
+
+    @pytest.fixture(autouse=True)
+    def setup_teardown(self):
+        """Set up and tear down for each test."""
+        self.pki_path = "/tmp/test_pki_renew_rfc4514"
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+
+        from upki_ca.ca.authority import Authority
+
+        Authority.reset_instance()
+
+        yield
+
+        if os.path.exists(self.pki_path):
+            shutil.rmtree(self.pki_path)
+        Authority.reset_instance()
+
+    def _authority(self):
+        from upki_ca.ca.authority import Authority
+        from upki_ca.storage.file_storage import FileStorage
+
+        storage = FileStorage(self.pki_path)
+        storage.initialize()
+        authority = Authority.get_instance()
+        authority.initialize(storage=storage, keychain=self.pki_path)
+        return authority
+
+    def _sign_csr_with_cn_and_o(self, authority, cn: str, org: str) -> None:
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+
+        private_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        csr = (
+            x509.CertificateSigningRequestBuilder()
+            .subject_name(
+                x509.Name(
+                    [
+                        x509.NameAttribute(NameOID.COMMON_NAME, cn),
+                        x509.NameAttribute(NameOID.ORGANIZATION_NAME, org),
+                    ]
+                )
+            )
+            .sign(private_key, hashes.SHA256())
+        )
+        csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode("utf-8")
+        authority.sign_csr(csr_pem, "server")
+
+    def test_renew_succeeds_with_comma_separated_multi_attribute_dn(self):
+        authority = self._authority()
+        self._sign_csr_with_cn_and_o(authority, "renew-me.example.com", "Test Corp")
+
+        # Same shape/order as `cert.subject.rfc4514_string()` for a
+        # CN-then-O subject (RFC 4514 lists attributes most-specific-first).
+        rfc4514_dn = "CN=renew-me.example.com,O=Test Corp"
+
+        new_cert, new_serial = authority.renew_certificate(rfc4514_dn)
+
+        assert new_cert.subject_cn == "renew-me.example.com"
+        assert new_serial != 0
+
+    def test_renew_succeeds_with_organization_first_dn(self):
+        """Same as above but with O before CN in the DN string - this is the
+        exact ordering that triggered bug #1 above (the pre-fix parser
+        consumed the whole rest of the string as O's value, so no "CN" key
+        was ever produced)."""
+        authority = self._authority()
+        self._sign_csr_with_cn_and_o(authority, "renew-me2.example.com", "Test Corp")
+
+        rfc4514_dn = "O=Test Corp,CN=renew-me2.example.com"
+
+        new_cert, _ = authority.renew_certificate(rfc4514_dn)
+
+        assert new_cert.subject_cn == "renew-me2.example.com"
 
 
 # Run tests if executed directly

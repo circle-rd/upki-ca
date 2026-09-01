@@ -52,6 +52,19 @@ class TestCommon:
         assert result["C"] == "FR"
         assert result["CN"] == "example.com"
 
+    def test_parse_dn_rfc4514_comma_separated(self):
+        """Test DN parsing for the comma-separated RFC 4514 format produced
+        by cryptography's ``Name.rfc4514_string()`` and passed through as-is
+        by the RA's inventory API (real bug found via a Phase 3 live smoke
+        test: revoke/renew/view/unrevoke/delete all silently failed with
+        "Certificate not found" for any real cert, since its DN always has
+        more than just a CN and therefore never contains a "/")."""
+        dn = "CN=example.com,O=Company"
+        result = Common.parse_dn(dn)
+
+        assert result["CN"] == "example.com"
+        assert result["O"] == "Company"
+
     def test_build_dn(self):
         """Test DN building."""
         components = {"C": "FR", "O": "Company", "CN": "example.com"}
